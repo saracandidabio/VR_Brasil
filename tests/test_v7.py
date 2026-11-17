@@ -42,7 +42,7 @@ def test_mapa_municipal_cor_vs_valores_reais():
                       'Registros':int(counts.get(str(ft['properties']['codigo_sivep']),0))}
                      for ft in geo['features']])
     assert len(df)==141
-    assert int(df.Registros.sum())==972
+    assert int(df.Registros.sum())==int(tab.loc[tab.uf.eq('MT') & tab.municipio.isin(df.Código),'influenza_a'].sum())
     df['Intensidade'],ticks,labels=escala(df['Registros'],'Quantis')
     fig=choropleth_map(df,geo,code_col='Código',id_prop='codigo_sivep',
          name_col='Município',value_col='Intensidade',

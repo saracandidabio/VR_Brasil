@@ -171,6 +171,34 @@ def geojson():
         return json.loads(p.read_text(encoding='utf-8'))
     except Exception:return None
 
+@st.cache_data(show_spinner='Carregando tabelas municipais já processadas...')
+def load_municipal_brasil(data_dir:str, years:tuple[int,...]):
+    """Aceita apenas agregados da mesma extração SHA256 dos cubos nacionais."""
+    root=Path(data_dir)
+    path=root/'municipios_brasil_manifest.json'
+    if not path.exists():
+        return pd.DataFrame(),[]
+    try:
+        municipal_meta=json.loads(path.read_text(encoding='utf-8'))
+        national_meta=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
+    except (OSError,ValueError):
+        return pd.DataFrame(),[]
+    frames=[];accepted=[]
+    for year in years:
+        info=municipal_meta.get('anos',{}).get(str(year),{})
+        source=national_meta.get('anos',{}).get(str(year),{})
+        target=root/f'municipios_brasil_{year}.csv.gz'
+        if (not target.exists() or not info.get('compatibilidade_cubo_nacional') or
+            info.get('sha256_original') != source.get('sha256_original') or
+            int(info.get('notificacoes_fonte',-1)) != int(source.get('notificacoes',-2))):
+            continue
+        table=pd.read_csv(target,compression='gzip',
+                     dtype={'uf':'string','municipio':'string'},low_memory=False)
+        frames.append(table)
+        accepted.append(year)
+    return (pd.concat(frames,ignore_index=True) if frames else pd.DataFrame()),accepted
+
+
 def number(x):return f'{int(x):,}'.replace(',','.')
 def percent(n,d):return f'{100*float(n)/float(d):.1f}%'.replace('.',',') if d else '—'
 def chart(fig, height=400):
@@ -328,32 +356,34 @@ def trend_page(df,focus):
     with st.expander('Resumo anual dos registros'):
         st.dataframe(yr.sort_values('ano'),hide_index=True,use_container_width=True)
 
-def geography(df,focus, selected_ufs, municipal_data, year_scope):
+def geography(df,focus, selected_ufs, municipal_data, year_scope, nationwide_mun, nationwide_years):
     title('Distribuição geográfica',
-          'Distribuição de notificações por residência. Brasil: UFs (2019–2026); MT/MS: municípios (2023–2026). Valores absolutos.')
-    # Mudança de escala: somente MT e/ou MS selecionados => mapa municipal.
-    # Os cubos nacionais não possuem município nem conservam cruzamentos
-    # por semana, idade ou sexo na escala municipal. Nunca reaproveitar os
-    # totais filtrados nacionais como se fossem totais municipais.
-    municipio_ufs = {'MT','MS'}
-    municipio_years = {2023,2024,2025,2026}
-    if selected_ufs and set(selected_ufs).issubset(municipio_ufs):
-        mapa_anos = sorted(set(year_scope).intersection(municipio_years))
-        if mapa_anos and not municipal_data.empty:
-            mapa = municipal_data[municipal_data.ano.isin(mapa_anos)]
-            st.caption('**Visualização municipal ampliada:** '+', '.join(selected_ufs)
-                       +' · anos '+', '.join(map(str,mapa_anos))
-                       +'. As contagens por município são anuais; os filtros de sexo, idade'
-                       +' e semana NÃO se aplicam a este mapa.')
-            if len(mapa_anos)<len(set(year_scope)):
-                st.info('O detalhamento municipal cobre apenas 2023–2026. '
-                        'Os anos 2019–2022 permanecem disponíveis no mapa estadual, '
-                        'quando selecionados sem restringir a MT/MS.')
-            if municipal_map(mapa, list(selected_ufs), focus, str(DATA), height=690):
+          'Mapa nacional por UF; ao selecionar uma ou mais UFs, ampliação municipal com base em CO_MUN_RES. Contagens absolutas, escala linear.')
+    relevant_years=sorted(set(year_scope))
+    if selected_ufs:
+        municipal_ready=set(nationwide_years)&set(relevant_years)
+        found= nationwide_mun.loc[nationwide_mun.ano.isin(municipal_ready) & nationwide_mun.uf.isin(selected_ufs)].copy() if not nationwide_mun.empty else pd.DataFrame()
+        years_shown=set(municipal_ready)
+        fallback_years=set(relevant_years)-municipal_ready
+        if set(selected_ufs).issubset({'MT','MS'}) and not municipal_data.empty:
+            regional=municipal_data.loc[municipal_data.ano.isin(fallback_years) & municipal_data.uf.isin(selected_ufs)].copy()
+            if not regional.empty:
+                found=pd.concat([found,regional],ignore_index=True) if not found.empty else regional
+                years_shown.update(regional.ano.unique().tolist())
+        missing_years=sorted(set(relevant_years)-set(years_shown))
+        if missing_years:
+            st.warning('Detalhamento municipal ainda não preparado para '+', '.join(map(str,missing_years))+'. '
+                       'Para incluir todos os municípios de 2019–2026, execute uma vez '
+                       '`bash preparar_brasil_uma_vez.sh` no Mac e publique os novos arquivos `data/`.')
+        if not found.empty:
+            st.caption('Municípios de **'+', '.join(selected_ufs)+'** • anos efetivamente representados: **'+
+                       ', '.join(map(str,sorted(years_shown)))+'**. '
+                       'Este mapa municipal é anual e independe dos filtros de sexo, idade e semana.')
+            if municipal_map(found,list(selected_ufs),focus,str(DATA),height=675):
                 return
         else:
-            st.info('O mapa municipal está disponível para 2023–2026. '
-                    'Selecione ao menos um desses anos ou consulte o mapa estadual abaixo.')
+            st.info('Nenhuma tabela municipal compatível disponível neste recorte. '
+                    'O mapa estadual abaixo continua acessível.')
     if no_rows(df):return
     a=summarize(df,['uf'])
     a=a[a.uf.isin(CAPITALS)].copy().sort_values(agent_col(focus),ascending=False)
@@ -363,56 +393,46 @@ def geography(df,focus, selected_ufs, municipal_data, year_scope):
     a['UF']=a['uf']
     a['lat']=a.uf.map({k:v[0] for k,v in CAPITALS.items()})
     a['lon']=a.uf.map({k:v[1] for k,v in CAPITALS.items()})
-    st.caption('Indicador no mapa: '+(VIRUSES[focus] if focus!='todos' else 'Todas as notificações de SRAG'))
-    if selected_ufs:
-        st.info('Zoom automático ativado para: ' + ', '.join(selected_ufs) + '. O mapa estadual mantém as delimitações das demais UFs para facilitar a orientação espacial.')
-    map_base=st.radio('Base cartográfica',['Com fundo cartográfico','Sem fundo externo'],horizontal=True,key='mapa_estilo_geografia')
-    c1,c2=st.columns([1.7,0.85],gap='large')
+    st.caption('Indicador no mapa estadual: '+(VIRUSES[focus] if focus!='todos' else 'Todas as notificações de SRAG'))
+    map_base=st.radio('Base cartográfica',['Com fundo cartográfico','Sem fundo externo'],
+                      horizontal=True,key='mapa_estilo_geografia')
+    c1,c2=st.columns([1.55,0.95],gap='large')
     with c1:
         features=geojson()
         used_polygons=False
         if features and len(features.get('features',[]))==27:
             prop=features['features'][0].get('properties',{})
             key=next((x for x in ('sigla','SIGLA','uf','UF') if x in prop),None)
-            if key:
-                if geometry_valid(features,key):
-                    # Mantém o contorno de todas as UFs, mas enquadra automaticamente
-                    # o recorte selecionado quando filtros de UF são acionados.
-                    focus_codes=set(selected_ufs) if selected_ufs else set(a['uf'].astype(str))
-                    camera_geo={'type':'FeatureCollection','features':[
-                        ft for ft in features['features'] if str(ft['properties'][key]) in focus_codes]}
-                    fig=choropleth_map(
-                        a,features,code_col='uf',id_prop=key,
-                        name_col='UF',value_col='Indicador',scope='BR',
-                        auto_camera=True,camera_geo=camera_geo,
-                        line_color='#6b7e8a', line_width=1.05 if selected_ufs else 0.82,
-                        style='carto-positron' if map_base=='Com fundo cartográfico' else 'white-bg')
-                    chart(fig,635)
-                    used_polygons=True
+            if key and geometry_valid(features,key):
+                focus_codes=set(selected_ufs) if selected_ufs else set(a['uf'].astype(str))
+                camera_geo={'type':'FeatureCollection','features':[
+                    ft for ft in features['features'] if str(ft['properties'][key]) in focus_codes]}
+                fig=choropleth_map(a,features,code_col='uf',id_prop=key,
+                    name_col='UF',value_col='Indicador',scope='BR',
+                    auto_camera=True,camera_geo=camera_geo,
+                    line_color='#647a88',line_width=1.15,
+                    style='carto-positron' if map_base=='Com fundo cartográfico' else 'white-bg')
+                chart(fig,625)
+                used_polygons=True
         if not used_polygons:
-            # MapLibre com mosaicos de mapa é mais legível do que scatter_geo sem malha.
-            # São pontos representativos da UF, NÃO coordenadas de pacientes.
-            fig=px.scatter_map(
-                a,lat='lat',lon='lon',size='Indicador',color='Indicador',
+            fig=px.scatter_map(a,lat='lat',lon='lon',size='Indicador',color='Indicador',
                 hover_name='UF',hover_data={'notificacoes':':,','Indicador':':,','lat':False,'lon':False},
                 map_style='open-street-map',center={'lat':-15.3,'lon':-53.1},zoom=2.9,
-                size_max=40,color_continuous_scale=['#7cb5c9','#155a72','#0c394f']
-            )
-            fig.update_traces(marker={'opacity':.82})
-            fig.update_layout(coloraxis_colorbar=dict(title='Registros',len=.72))
-            chart(fig,620)
-            st.caption('Mapa de apoio: cada círculo foi posicionado na capital para representar a UF; as coordenadas não correspondem aos locais dos casos. A visualização com polígonos depende de `data/malha_uf.geojson`. O mapa base utiliza mosaicos cartográficos online.')
+                size_max=40,color_continuous_scale=['#7cb5c9','#155a72','#0c394f'])
+            chart(fig,610)
+            st.caption('Pontos de apoio posicionados nas capitais apenas para indicar a UF, não o local dos casos.')
     with c2:
         shown=a.sort_values('Indicador').tail(15)
         fig=px.bar(shown,x='Indicador',y='UF',orientation='h',text='Indicador',
-                   color_discrete_sequence=[C_PRIMARY],title='15 UFs com mais registros')
+               color_discrete_sequence=[C_PRIMARY],title='15 UFs com mais registros')
         fig.update_traces(textposition='outside',cliponaxis=False)
-        fig.update_layout(xaxis_title='Notificações',yaxis_title='',margin=dict(l=2,r=32,t=50,b=15))
+        fig.update_layout(xaxis_title='Registros',yaxis_title='',margin=dict(l=2,r=38,t=50,b=15))
         chart(fig,620)
     st.subheader('Tabela por unidade da federação')
     st.dataframe(a[['UF','notificacoes','Indicador','obitos_srag']].sort_values('Indicador',ascending=False),
                  hide_index=True,use_container_width=True)
-    st.caption('A maior quantidade de notificações não significa necessariamente maior risco: as comparações dependem de população, intensidade de testagem e acesso aos serviços de saúde.')
+    st.caption('Valores absolutos por município de residência; não representam risco, incidência ou positividade entre testados.')
+
 
 def classification_without_lab_panel(df, *, compact=False):
     """Mostra exclusivamente notificações CLASSI_FIN sem resultado registrado.
@@ -631,7 +651,8 @@ def methods(meta):
 - Dados de 2025 e 2026 são sujeitos a revisão; o dashboard **não se atualiza sozinho**. Reprocessar e publicar novos agregados para mudar o snapshot.
 - Arquivos de publicação são **agregados**, sem nomes, datas diárias ou números de notificação. O complemento municipal inclui município e ano, sem sexo, idade ou semana; os gráficos temporais de maior escala retêm estratos epidemiológicos. Agregação **não é garantia formal de anonimização**; avaliar ocultação de células pequenas antes de publicar.
 - O complemento 2023–2026 foi construído separadamente a partir dos CSVs oficiais, sem alterar ou somar novamente os cubos nacionais.
-- Município por `CO_MUN_RES` (residência); malhas municipais do IBGE. Não é município da coleta, atendimento ou notificação.
+- Município por `CO_MUN_RES` (residência); malhas municipais do IBGE. Não é município da coleta, atendimento ou notificação. A escala de cor municipal é **linear em valores absolutos**, com zero como mínimo.
+- A base municipal nacional pode ser preparada de forma sincronizada em 2019–2026 com `bash preparar_brasil_uma_vez.sh`. Até isso acontecer, municípios detalhados permanecem disponíveis apenas nos estados/anos já processados; os totais estaduais continuam íntegros.
 - Influenza A e B são distinguidas por tipagem laboratorial positiva, não exclusivamente por `CLASSI_FIN`. Subtipos H1N1/H3N2 e linhagens Victoria/Yamagata são contados apenas com PCR positivo e subtipo/linhagem informados.
 - **Limite da tipagem A/B no dashboard:** o complemento 2023–2026 tem escopos Brasil, Centro-Oeste, MT e MS. Os cubos históricos de 2019–2022 e as UFs restantes não preservam a separação A/B. Essas combinações ficam indisponíveis, nunca artificialmente zeradas.
 - As figuras têm opção de exportar PNG redesenhado com os mesmos dados e metadados de **800 dpi**. Esse exportador não captura os elementos interativos da página.
@@ -680,7 +701,7 @@ with st.sidebar:
     focus=st.selectbox('Agente em foco',['todos',*VIRUSES],index=0,
                         format_func=lambda x:'Todos os registros' if x=='todos' else VIRUSES[x],key='f_focus')
     st.divider()
-    st.caption('Selecione MT ou MS em UF de residência para exibir municípios na página Geografia.')
+    st.caption('Ao escolher qualquer UF, o mapa geográfico amplia para os municípios disponíveis. Escala de cores linear.')
     st.caption('Snapshot offline: dados previamente tratados e versionados no GitHub.')
     st.caption('Última preparação: '+str(META.get('gerado_em_utc','não informada'))[:10])
 
@@ -691,6 +712,7 @@ if sex_sel:filtered=filtered[filtered.sexo.isin(sex_sel)]
 if age_sel:filtered=filtered[filtered.faixa_etaria.isin(age_sel)]
 
 # Complementos independentes não sobrescrevem os cubos nacionais.
+MUN_BR, MUN_BR_YEARS = load_municipal_brasil(str(DATA),tuple(available))
 CO_MUN = load_complement(str(DATA),tuple(available),'municipios')
 if not CO_MUN.empty:
     CO_MUN = CO_MUN[CO_MUN.ano.isin(years)]
@@ -705,7 +727,7 @@ st.session_state['_v4_chart_ix']=0
 if page==PAGES[0]:overall(filtered,focus)
 elif page==PAGES[1]:virus_page(filtered,focus)
 elif page==PAGES[2]:trend_page(filtered,focus)
-elif page==PAGES[3]:geography(filtered,focus,ufs_sel,CO_MUN,years)
+elif page==PAGES[3]:geography(filtered,focus,ufs_sel,CO_MUN,years,MUN_BR,MUN_BR_YEARS)
 elif page==PAGES[4]:regional_page(filtered,CO_MUN,CO_TIME,years,ufs_sel,focus,str(DATA))
 elif page==PAGES[5]:influenza_page(filtered,CO_MUN,years)
 elif page==PAGES[6]:epidemiology(filtered,focus)

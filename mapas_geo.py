@@ -10,6 +10,7 @@ import math
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 
 SCALE = ['#e7f2f8','#b5d7e5','#7bacbf','#4088a6','#195a79','#103c53']
 # Centro e zoom iniciais para janela de aproximadamente 800px.
@@ -111,6 +112,7 @@ def choropleth_map(
         hover_name=name_col,
         hover_data={code_col:False, value_col:False, **(extra_hover_cols or {})},
         color_continuous_scale=SCALE,
+        range_color=(0,max(float(a[value_col].max()),1)),
         labels={value_col:'Registros'},
         map_style=style,
         center=params['center'], zoom=params['zoom'],
@@ -136,4 +138,43 @@ def choropleth_map(
         paper_bgcolor='rgba(0,0,0,0)',
         uirevision=None,
     )
+    return fig
+
+
+def state_boundary_overlay(fig, state_geo:dict | None, selected_ufs: list[str] | None=None):
+    """Mostra limites estaduais por cima das malhas municipais (sem recolorir)."""
+    if not state_geo:
+        return fig
+    feats=state_geo.get('features',[])
+    if not feats:return fig
+    key=next((x for x in ('sigla','SIGLA','uf','UF') if x in feats[0].get('properties',{})),None)
+    if not key:return fig
+    selected=set(selected_ufs or [])
+    def lines(parts):
+        lons=[];lats=[]
+        for ft in parts:
+            g=ft.get('geometry') or {}
+            if g.get('type')=='Polygon':polys=[g.get('coordinates',[])]
+            elif g.get('type')=='MultiPolygon':polys=g.get('coordinates',[])
+            else:continue
+            for polygon in polys:
+                if polygon:
+                    for xy in polygon[0]:
+                        if len(xy)>1:
+                            lons.append(xy[0]);lats.append(xy[1])
+                    lons.append(None);lats.append(None)
+        return lons,lats
+    if selected:
+        others=[x for x in feats if str(x['properties'].get(key)) not in selected]
+        if others:
+            lon,lat=lines(others)
+            fig.add_trace(go.Scattermap(lon=lon,lat=lat,mode='lines',
+                            line=dict(color='#586774',width=1.4),
+                            hoverinfo='skip',showlegend=False,name='Limites das UFs'))
+    main=[x for x in feats if not selected or str(x['properties'].get(key)) in selected]
+    lon,lat=lines(main)
+    if lon:
+        fig.add_trace(go.Scattermap(lon=lon,lat=lat,mode='lines',
+                        line=dict(color='#394e5a',width=2.2 if selected else 1.5),
+                        hoverinfo='skip',showlegend=False,name='Limites estaduais'))
     return fig

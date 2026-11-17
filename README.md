@@ -1,49 +1,53 @@
 # Observatório de Vírus Respiratórios — SRAG Brasil
 
-**[Acessar o dashboard online — vrbrasil.streamlit.app](https://vrbrasil.streamlit.app/)**  
-[Código-fonte no GitHub](https://github.com/saracandidabio/VR_Brasil)
+**Acesse o dashboard:** https://vrbrasil.streamlit.app/
 
-**Idealização:** Sara Cândida Ferreira dos Santos.  
-**Fonte exclusiva:** Ministério da Saúde — SIVEP-Gripe/SRAG (dados oficiais públicos).
+**Idealização:** Sara Cândida Ferreira dos Santos.
 
-Painel exploratório em Streamlit para notificações de Síndrome Respiratória Aguda Grave (SRAG) e respectivos marcadores virais, desfechos e distribuição espacial. Notificações não são pessoas únicas, não equivalem a incidência populacional e não garantem deduplicação individual.
+## Sobre a base
 
-## Organização — versão 7
+O SIVEP-Gripe, sistema oficial do Ministério da Saúde, recebe registros de vigilância de **Síndrome Respiratória Aguda Grave (SRAG)** hospitalizada e óbitos por SRAG. Este projeto trabalha somente com notificações oficiais agregadas, permitindo comparar vírus respiratórios, distribuição temporal, perfil epidemiológico e distribuição espacial.
 
-O painel possui as áreas: Visão geral; Agentes virais; Séries temporais; Distribuição geográfica; Centro-Oeste · MT e MS; **Influenza A e B**; Perfil epidemiológico; Explorador de dados; Métodos e auditoria.
+**Fonte:** https://dadosabertos.saude.gov.br/dataset/srag-2019-a-2026
 
-- **Nacional 2019–2026:** oito arquivos anuais agregados, mantendo os recortes de ano, semana epidemiológica, UF, sexo e faixa etária.
-- **Centro-Oeste, MT e MS 2023–2026:** complementos que guardam Influenza A/B, subtipos/linhagens e mapas municipais de MT/MS por ano.
-- **Aba Influenza A e B:** reúne em um só lugar indicadores, séries temporais, subtipos, linhagens, perfis, mapas municipais, classificações finais e exportação CSV. O quadro repetido de A/B foi retirado das demais abas. A aba de co-detecções foi removida temporariamente.
-- **Mapas municipais:** escolha entre quantis (padrão), raiz quadrada e escala linear. As cores podem realçar diferenças entre municípios, mas o valor absoluto original continua disponível no mapa interativo, no ranking e na tabela CSV. Limites municipais e estaduais mais destacados. No mapa nacional, o zoom por UF conserva as fronteiras estaduais; o detalhamento **municipal** somente existe para MT/MS na base incluída.
-- **Exportação científica:** PNG gerado pelo Matplotlib com metadados de resolução de 800 dpi.
+## Escopos e disponibilidade
 
-### Limitações metodológicas importantes
+- Brasil, todas as UFs: **2019–2026**, em agregados já incluídos na pasta `data/`.
+- Influenza A/B e destaque Centro-Oeste, MT e MS: complemento **2023–2026** já incluído.
+- Municípios de MT e MS: já possuem malha e complemento anual de 2023–2026.
+- Municípios das **27 UFs e de todos os anos 2019–2026**: passam a estar disponíveis depois de executar uma vez `bash preparar_brasil_uma_vez.sh` no seu Mac. Os microdados históricos necessários não acompanham este ZIP.
 
-A tipagem laboratorial INFA/INFB está disponível apenas no complemento **2023–2026**, para Brasil, Centro-Oeste, MT, MS e MT+MS. Não significa zero para 2019–2022 nem oferece A/B por outras UFs individualmente. `CLASSI_FIN=1` significa classificação final por influenza, mas **não distingue A de B**.
+## Novidades da V8
 
-A métrica *classificado como influenza sem resultado laboratorial registrado* só pode ser calculada nos microdados, cruzando `CLASSI_FIN` e resultados de PCR/antígeno. Os cubos incluídos ainda não contêm essa coluna. A aba de influenza avisa a indisponibilidade em vez de mostrar zero ou inferir um valor. Reconstruir os agregados oficiais com os scripts `construir_base.py` e `preparar_centro_oeste.py` será necessário apenas para preencher esse indicador adicional. O mesmo cuidado vale para as demais classificações sem resultado laboratorial.
+- Ao filtrar UF na **Distribuição geográfica**, mapa interativo por município de residência (`CO_MUN_RES`); sem UF, mapa por estado.
+- Nome da cidade e contagem exata ao passar o mouse, limites estaduais mais fortes, zoom automático e ranking municipal.
+- Todos os mapas **interativos** com **escala de cores linear em valores absolutos**, zero como limite inferior.
+- Manutenção da aba Influenza A e B, subtipos, linhagens e análises regionais; sem aba de co-detecções na navegação.
+- Exportação científica de mapas em **PNG 800 dpi**.
 
-Mapas municipais são anuais e não seguem filtros de sexo, idade e semana (evita inferências sobre pequenos grupos). Nos gráficos temporais, usar `SEM_PRI` e verificar cobertura do período. O painel não consulta o SIVEP-Gripe durante a navegação e não se atualiza automaticamente.
-
-## Executar e validar
-
-Instale Python 3.10+ e execute na pasta do projeto:
+## Preparar completamente no Mac (uma única vez)
 
 ```bash
-python3 -m pip install -r requirements.txt
-python3 validar_publicacao.py
-python3 -m pytest -q
+bash preparar_brasil_uma_vez.sh
+```
+
+O construtor preserva um único arquivo oficial por ano, gera as tabelas nacionais, municipais e de influenza da **mesma versão** e valida a igualdade de totais. A fonte bruta não é enviada ao GitHub. Após concluir, publique **todos os arquivos da pasta**, inclusive `data/` e `.streamlit/`, na raiz do repositório `VR_Brasil`.
+
+Para iniciar localmente (após instalar as dependências de `requirements.txt`):
+
+```bash
 streamlit run streamlit_app.py
 ```
 
-Todos os CSV agregados e GeoJSON necessários para esta versão estão em `data/`. **Não publique CSVs brutos com notificações individuais.**
+A versão publicada é um **snapshot**. Ela lê dados e malhas locais, sem baixar os CSVs do SIVEP-Gripe durante a navegação. O fundo cartográfico interativo pode usar mosaicos de mapas externos.
 
-### Atualizar o repositório
+## Limitações epidemiológicas
 
-Consulte [LEIA_PRIMEIRO.md](LEIA_PRIMEIRO.md) ou [PUBLICAR_GITHUB.md](PUBLICAR_GITHUB.md). Faça o upload de todo o **conteúdo** da pasta descompactada para a raiz do repositório, sem criar subpasta e sem enviar `.venv`, caches ou arquivos locais de download.
+- Notificações não representam necessariamente indivíduos únicos; o projeto não elimina automaticamente todas as duplicidades internas do SIVEP-Gripe.
+- Um marcador laboratorial positivo não equivale a uma classificação final; classificação epidemiológica e resultado de exame são apresentados separadamente.
+- Uma notificação pode ter mais de um vírus positivo; as contagens de agentes não são mutuamente exclusivas.
+- Municípios são de **residência**, não de coleta ou atendimento. Dados municipais são agregados apenas por município e ano, sem filtros de sexo, idade e semana no mapa.
+- Contagens absolutas não são taxas de incidência, prevalência ou positividade entre testados.
+- Malhas e códigos municipais podem mudar ao longo dos anos: divergências e locais não mapeáveis são explicitados pelo validador.
 
-### Referências de origem
-
-- [Ministério da Saúde — SRAG 2019–2026](https://dadosabertos.saude.gov.br/dataset/srag-2019-a-2026)
-- [IBGE — malhas geográficas](https://servicodados.ibge.gov.br/api/v3/malhas)
+**Geometria oficial:** https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais/15774-malhas.html
