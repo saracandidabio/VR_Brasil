@@ -9,6 +9,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 from paginas_centro_oeste import load_complement, apply_filters, municipal_map, regional_page
+from mapas_geo import choropleth_map, geometry_valid
 
 BASE=Path(__file__).resolve().parent
 DATA=BASE/'data'
@@ -211,8 +212,9 @@ def overall(df,focus):
         d=pd.DataFrame([{'Agente':name,'Registros':metric(df,'v_'+key)} for key,name in VIRUSES.items()])
         d=d.sort_values('Registros').tail(9)
         fig=px.bar(d,x='Registros',y='Agente',orientation='h',text='Registros',color_discrete_sequence=[C_PRIMARY])
-        fig.update_traces(textposition='outside',cliponaxis=False)
-        fig.update_layout(title='Marcadores positivos por agente viral')
+        fig.update_traces(textposition='outside',cliponaxis=False,texttemplate='%{x:,.0f}')
+        fig.update_layout(title='Marcadores positivos por agente viral',margin=dict(l=8,r=110,t=40,b=15))
+        fig.update_xaxes(range=[0,max(d['Registros'].max(),1)*1.23])
         chart(fig,465)
     with b:
         summary=summarize(df,['ano','semana'])
@@ -222,7 +224,7 @@ def overall(df,focus):
         fig.add_trace(go.Scatter(x=summary['período'],y=summary['notificacoes'],name='Todas as notificações',mode='lines',line_color=C_PRIMARY))
         fig.add_trace(go.Scatter(x=summary['período'],y=summary[agent_col(focus)] if focus!='todos' else summary['com_deteccao'],
                                  name=VIRUSES.get(focus,'Com detecção viral'),mode='lines',line_color=C_SECONDARY))
-        fig.update_layout(title='Distribuição por semana epidemiológica',xaxis_title='Ano – SE',yaxis_title='Notificações',hovermode='x unified')
+        fig.update_layout(title='Distribuição por semana epidemiológica',xaxis_title='Ano – SE',yaxis_title='Notificações',hovermode='x unified',xaxis=dict(type='category',nticks=13,tickangle=-35),legend=dict(orientation='h',y=1.16,x=0))
         chart(fig,465)
     st.caption('Marcadores não são categorias mutuamente exclusivas. Resultado ausente não significa teste negativo. Não equivale a prevalência, incidência ou positividade entre testados.')
 
@@ -247,24 +249,68 @@ def virus_page(df,focus):
     st.caption('Codetecção: coexistência de marcadores em uma notificação; não necessariamente coinfecção ativa.')
 
 def trend_page(df,focus):
-    title('Séries temporais','Anos epidemiológicos dos arquivos oficiais e semana de início dos sintomas (SEM_PRI).')
+    title('Séries temporais','Notificações por semana epidemiológica (SEM_PRI) e marcadores laboratoriais; 2019–2026.')
     if no_rows(df):return
     agg=summarize(df,['ano','semana'])
-    agg=agg[agg.semana.between(1,53)].sort_values(['ano','semana'])
+    agg=agg[agg.semana.between(1,53)].sort_values(['ano','semana']).copy()
+    if agg.empty:
+        st.info('Nenhuma semana válida no período selecionado.')
+        return
     agg['Ano (categoria)']=agg['ano'].astype(str)
-    tab1,tab2=st.tabs(['Sobreposição das temporadas','Série cronológica'])
+    agg['Ano – SE']=agg['ano'].astype(str)+'-SE'+agg['semana'].astype(str).str.zfill(2)
+    tab1,tab2,tab3=st.tabs(['Temporadas sobrepostas','Série cronológica','Série temporal por agente'])
     with tab1:
         graph=px.line(agg,x='semana',y=agent_col(focus),color='Ano (categoria)',markers=False,
-               labels={'semana':'Semana epidemiológica','ano':'Ano','notificacoes':'Notificações',f'v_{focus}':'Detecções'},
-               title='Comparação das semanas entre anos')
-        chart(graph,470)
-        st.caption('Comparações entre temporadas são influenciadas por mudanças de vigilância, testagem e preenchimento, especialmente a partir de 2020.')
+            labels={'semana':'Semana epidemiológica','ano':'Ano','notificacoes':'Notificações',f'v_{focus}':'Detecções'},
+            title='Comparação das semanas entre anos')
+        graph.update_layout(hovermode='x unified',xaxis=dict(dtick=4))
+        chart(graph,465)
+        st.caption('Comparações entre temporadas são influenciadas por mudanças de vigilância, testagem e preenchimento, especialmente após 2020.')
     with tab2:
-        agg['Ano – SE']=agg['ano'].astype(str)+'-SE'+agg['semana'].astype(str).str.zfill(2)
-        fig=px.bar(agg,x='Ano – SE',y=agent_col(focus),color_discrete_sequence=[C_PRIMARY],title='Notificações por período')
-        chart(fig,450)
+        fig=px.line(agg,x='Ano – SE',y=agent_col(focus),color_discrete_sequence=[C_PRIMARY],
+                    title='Notificações ou detecções por período')
+        fig.update_layout(xaxis=dict(type='category',nticks=15,tickangle=-40),hovermode='x unified',
+                          xaxis_title='Ano e semana epidemiológica',yaxis_title='Registros')
+        chart(fig,465)
+    with tab3:
+        st.markdown('**Compare a evolução temporal de diferentes agentes virais.**')
+        defaults=[focus] if focus!='todos' else ['influenza','vsr','sars_cov_2']
+        selected=st.multiselect('Alvos virais',list(VIRUSES),default=defaults,
+                                format_func=lambda k:VIRUSES[k],key='series_agentes')
+        chartmode=st.radio('Forma de comparação',['Linha do tempo contínua','Temporadas sobrepostas'],
+                           horizontal=True,key='series_modo')
+        if not selected:
+            st.info('Selecione pelo menos um alvo viral.')
+        else:
+            labelmap={f'v_{k}':v for k,v in VIRUSES.items()}
+            melted=agg.melt(id_vars=['ano','semana','Ano – SE'],value_vars=[f'v_{k}' for k in selected],
+                            var_name='Alvo',value_name='Detecções')
+            melted['Alvo']=melted['Alvo'].map(labelmap)
+            if chartmode=='Linha do tempo contínua':
+                plot=px.line(melted,x='Ano – SE',y='Detecções',color='Alvo',
+                             title='Detecções por vírus e semana epidemiológica')
+                plot.update_layout(xaxis=dict(type='category',nticks=17,tickangle=-40),
+                                   hovermode='x unified',legend=dict(orientation='h',y=1.13,x=0))
+                chart(plot,525)
+            else:
+                single=st.selectbox('Alvo para comparar os anos',selected,
+                                    format_func=lambda x:VIRUSES[x],key='series_foco_ano')
+                one=agg[['ano','semana',f'v_{single}']].rename(columns={f'v_{single}':'Detecções'}).copy()
+                one['Ano']=one.ano.astype(str)
+                plot=px.line(one,x='semana',y='Detecções',color='Ano',
+                             title=VIRUSES[single]+' — temporadas por ano')
+                plot.update_layout(xaxis=dict(dtick=4),hovermode='x unified')
+                chart(plot,470)
+            st.caption('Uma notificação pode ter mais de um marcador positivo. As linhas não representam incidência populacional nem positividade entre testados.')
+            selected_col=[f'v_{k}' for k in selected]
+            yearly=agg.groupby('ano',observed=True)[selected_col].sum().reset_index().rename(columns=labelmap)
+            st.dataframe(yearly,hide_index=True,use_container_width=True)
+            st.download_button('Exportar série semanal por agente (CSV)',
+                agg[['ano','semana',*selected_col]].to_csv(index=False).encode('utf-8-sig'),
+                'srag_serie_por_agente.csv','text/csv')
     yr=summarize(df,['ano'])[['ano','notificacoes','com_deteccao','obitos_srag']]
-    st.dataframe(yr.sort_values('ano'),hide_index=True,use_container_width=True)
+    with st.expander('Resumo anual dos registros'):
+        st.dataframe(yr.sort_values('ano'),hide_index=True,use_container_width=True)
 
 def geography(df,focus, selected_ufs, municipal_data, year_scope):
     title('Distribuição geográfica',
@@ -302,6 +348,7 @@ def geography(df,focus, selected_ufs, municipal_data, year_scope):
     a['lat']=a.uf.map({k:v[0] for k,v in CAPITALS.items()})
     a['lon']=a.uf.map({k:v[1] for k,v in CAPITALS.items()})
     st.caption('Indicador no mapa: '+(VIRUSES[focus] if focus!='todos' else 'Todas as notificações de SRAG'))
+    map_base=st.radio('Base cartográfica',['Com fundo cartográfico','Sem fundo externo'],horizontal=True,key='mapa_estilo_geografia')
     c1,c2=st.columns([1.7,0.85],gap='large')
     with c1:
         features=geojson()
@@ -310,17 +357,18 @@ def geography(df,focus, selected_ufs, municipal_data, year_scope):
             prop=features['features'][0].get('properties',{})
             key=next((x for x in ('sigla','SIGLA','uf','UF') if x in prop),None)
             if key:
-                fig=px.choropleth(
-                    a,geojson=features,locations='uf',featureidkey=f'properties.{key}',
-                    color='Indicador',hover_name='UF',
-                    hover_data={'notificacoes':':,','Indicador':':,','uf':False},
-                    color_continuous_scale=['#e7f2f7','#bedae7','#7cb5c9','#2b789c','#12425d']
-                )
-                fig.update_geos(fitbounds='locations',visible=False,
-                    projection_type='mercator',showcoastlines=False)
-                fig.update_layout(coloraxis_colorbar=dict(title='Registros',len=.72))
-                chart(fig,620)
-                used_polygons=True
+                if geometry_valid(features,key):
+                    # MapLibre: todas as 27 UFs visíveis, sem fitbounds instável.
+                    # Filtra os polígonos e centraliza automaticamente em UFs selecionadas.
+                    selected_codes=set(a['uf'].astype(str))
+                    selected_geo={'type':'FeatureCollection','features':[
+                        ft for ft in features['features'] if str(ft['properties'][key]) in selected_codes]}
+                    fig=choropleth_map(
+                        a,selected_geo,code_col='uf',id_prop=key,
+                        name_col='UF',value_col='Indicador',scope='BR',
+                        auto_camera=True,style='carto-positron' if map_base=='Com fundo cartográfico' else 'white-bg')
+                    chart(fig,635)
+                    used_polygons=True
         if not used_polygons:
             # MapLibre com mosaicos de mapa é mais legível do que scatter_geo sem malha.
             # São pontos representativos da UF, NÃO coordenadas de pacientes.

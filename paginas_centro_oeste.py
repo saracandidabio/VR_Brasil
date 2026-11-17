@@ -9,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from mapas_geo import choropleth_map, geometry_valid
 
 UF_DETAIL = ('MT','MS')
 CO_UFS = ('MT','MS','GO','DF')
@@ -100,16 +101,14 @@ def municipal_map(mun: pd.DataFrame, ufs: list[str], agent: str, data_dir: str, 
     if not rows:
         return False
     df = pd.DataFrame(rows)
-    fig = px.choropleth(df, geojson={'type':'FeatureCollection','features':polys},
-                        locations='Código',featureidkey='properties.codigo_sivep',
-                        color='Registros',hover_name='Município',
-                        hover_data={'Código':True,'Registros':':,'},
-                        color_continuous_scale='Blues',
-                        labels={'Registros':'Notificações'})
-    fig.update_geos(fitbounds='locations',visible=False,projection_type='mercator',
-                    showcoastlines=False,showland=True,landcolor='#e8eff2')
-    fig.update_traces(marker_line_color='#edf2f5',marker_line_width=.7)
-    fig.update_layout(coloraxis_colorbar=dict(title='Registros',thickness=13,len=.75))
+    map_base=st.radio('Base cartográfica',['Com fundo cartográfico','Sem fundo externo'],horizontal=True,key='mapa_estilo_municipal')
+    scope = 'MT+MS' if set(ufs)=={'MT','MS'} else ufs[0]
+    fig = choropleth_map(
+        df, {'type':'FeatureCollection','features':polys},
+        code_col='Código', id_prop='codigo_sivep',
+        name_col='Município', value_col='Registros',
+        scope=scope, style='carto-positron' if map_base=='Com fundo cartográfico' else 'white-bg',
+    )
     chart(fig,height)
     unknown = count(frame[frame.municipio.eq('Não informado')],metric)
     st.caption(f'Municípios de residência (CO_MUN_RES) · malha IBGE · '
@@ -189,6 +188,43 @@ def regional_page(national_filtered: pd.DataFrame, mun: pd.DataFrame, timeline: 
         fig.update_layout(hovermode='x unified')
         chart(fig,435)
 
+    st.subheader('Circulação semanal por agente viral')
+    st.caption('Compare marcadores positivos de diferentes vírus no recorte regional escolhido. Este detalhamento cobre 2023–2026.')
+    target_names={
+        'v_influenza':'Influenza (qualquer tipo)',
+        'v_sars_cov_2':'SARS-CoV-2',
+        'v_vsr':'VSR',
+        'v_rinovirus':'Rinovírus',
+        'v_parainfluenza':'Parainfluenza',
+        'v_adenovirus':'Adenovírus',
+        'v_metapneumovirus':'Metapneumovírus',
+        'v_bocavirus':'Bocavírus',
+        'v_outros_virus':'Outros vírus',
+        'influenza_a':'Influenza A',
+        'influenza_b':'Influenza B',
+    }
+    choices=st.multiselect('Alvos para comparar no Centro-Oeste',list(target_names),
+        default=['influenza_a','influenza_b','v_vsr'],format_func=lambda k:target_names[k],
+        key='regio_alvos')
+    if choices:
+        selected_week=temp[temp.semana.between(1,53)].groupby(['ano','semana'],observed=True)[choices].sum().reset_index().sort_values(['ano','semana'])
+        if not selected_week.empty:
+            selected_week['Ano – SE']=selected_week.ano.astype(str)+'-SE'+selected_week.semana.astype(str).str.zfill(2)
+            long=selected_week.melt(id_vars=['ano','semana','Ano – SE'],value_vars=choices,
+                                    var_name='Alvo',value_name='Detecções')
+            long['Alvo']=long['Alvo'].map(target_names)
+            chart_line=px.line(long,x='Ano – SE',y='Detecções',color='Alvo',
+                title='Detecções semanais por agente viral')
+            chart_line.update_layout(hovermode='x unified',
+                xaxis=dict(type='category',nticks=16,tickangle=-35),
+                legend=dict(orientation='h',y=1.15,x=0))
+            chart(chart_line,465)
+            st.download_button('Exportar série regional por alvo (CSV)',
+                selected_week.to_csv(index=False).encode('utf-8-sig'),
+                'srag_serie_regional_alvos.csv','text/csv')
+    else:
+        st.info('Selecione pelo menos um alvo.')
+
     left,right=st.columns([1.1,1],gap='large')
     with left:
         st.subheader('Março de cada ano')
@@ -208,7 +244,8 @@ def regional_page(national_filtered: pd.DataFrame, mun: pd.DataFrame, timeline: 
         sub=pd.DataFrame([{'Identificação':name,'Detecções':count(temp,key)} for key,name in vals])
         fig=px.bar(sub.sort_values('Detecções'),x='Detecções',y='Identificação',orientation='h',
                    text='Detecções',color_discrete_sequence=[TEAL])
-        fig.update_traces(textposition='outside',cliponaxis=False)
+        fig.update_traces(textposition='outside',cliponaxis=False,texttemplate='%{x:,.0f}')
+        fig.update_xaxes(range=[0,max(sub['Detecções'].max(),1)*1.22])
         chart(fig,395)
 
     with st.expander('Tabela: março de 2023–2026 no Brasil, Centro-Oeste, MT e MS'):

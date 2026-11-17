@@ -73,3 +73,29 @@ streamlit run streamlit_app.py
 ```
 
 Para reconstruir apenas o complemento de um ano, use `python preparar_centro_oeste.py --anos 2026 --reprocessar`. Para usar um CSV oficial já baixado, use `--arquivo-local CAMINHO --ano-local 2026`. Para baixar só as malhas, use `--apenas-malhas`.
+
+
+## Atualização de novembro de 2026 — mapas e séries por agente
+
+O dashboard usa `mapas_geo.py` e `plotly.express.choropleth_map` para representar
+polígonos das 27 UFs e dos municípios de MT e MS. A câmera é calculada a partir
+dos polígonos selecionados, sem depender do enquadramento `fitbounds` do navegador.
+A seleção de MT e/ou MS na barra lateral ativa o mapa municipal (2023–2026).
+Para outras UFs o mapa dá zoom automático na região selecionada. As malhas
+continuam embarcadas na pasta `data/`. O mapa base cartográfico pode buscar
+pequenos mosaicos da Carto, mas **não consulta novas notificações**.
+
+A página **Séries temporais → Série temporal por agente** permite comparar
+marcadores de influenza, SARS-CoV-2, VSR, rinovírus, adenovírus e outros alvos
+entre 2019 e 2026. Na página **Centro-Oeste · MT e MS** também há comparação
+semanal de vírus respiratórios, incluindo Influenza A e B, no período 2023–2026.
+Os gráficos permitem exportação CSV. Um registro pode ter múltiplos marcadores.
+
+**Como publicar**: mantenha o conteúdo integral deste projeto na raiz do seu
+repositório `VR_Brasil`. Envie também `mapas_geo.py`, `data/` e
+`tests/test_mapas.py`. **Não** refaça downloads nem substitua o `manifest.json`
+por versões mais antigas; esta distribuição já inclui as tabelas preparadas.
+
+A integração com o navegador (renderização visual efetiva) deve ser conferida
+no Streamlit após o deploy. Os testes locais verificam a presença das malhas,
+seus códigos de ligação e a criação de figuras Plotly compatíveis.
