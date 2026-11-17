@@ -17,11 +17,9 @@
       "sha256_origem": "639b748fb2838336bbaf0882608159790274734b21abdb02b303ee6076bb5e4a",
       "municipios": "municipios_co_2023.csv.gz",
       "temporal": "temporal_influenza_2023.csv.gz",
-      "sha256_municipios": "a403e5eeca5e7b9e1ebcacd939ce17d9e300464c375ca171857dc62efacb3838",
-      "sha256_temporal": "c5bcbff70dd8daa399ccc98f2ed2e7fe10bb4b8d8a42b0b5f0a84d03e45da9af",
-      "origem": "https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/SRAG/2023/INFLUD23-23-03-2026.csv",
-      "notificacoes_cubo_nacional": 279453,
-      "compativel_com_cubo_nacional": true
+      "sha256_municipios": "2e147f77e2ccb6b581c09612f104b967b765b8ef55d6de212a5180711e4db1d1",
+      "sha256_temporal": "64378efb18025d578f4a11a9fec67da8662c6ceb7f4a2b5abd96cf2bedacc430",
+      "origem": "https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/SRAG/2023/INFLUD23-23-03-2026.csv"
     },
     "2024": {
       "ano": 2024,
@@ -32,11 +30,9 @@
       "sha256_origem": "b516f6eae61203dae757c3fef0f46a8b61f9de202199c7b8e682212a0d94a8a4",
       "municipios": "municipios_co_2024.csv.gz",
       "temporal": "temporal_influenza_2024.csv.gz",
-      "sha256_municipios": "461aab4d0cffb73b04a7201b0848d68829c82291dc9a3d1d7230871d79a92e83",
-      "sha256_temporal": "c6aff9faa45c77a19b6626bd5113a73da382b9130c8d7e4df928e3c3aa5389ad",
-      "origem": "https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/SRAG/2024/INFLUD24-23-03-2026.csv",
-      "notificacoes_cubo_nacional": 267986,
-      "compativel_com_cubo_nacional": true
+      "sha256_municipios": "8fe33f1223248148714050ea5cf2b662224e957d7a66969c1f5fdef4c556f294",
+      "sha256_temporal": "2878c739fac1d1c92f053bbb7592c645c3550156841517aae1b0d83e3cac514f",
+      "origem": "https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/SRAG/2024/INFLUD24-23-03-2026.csv"
     },
     "2025": {
       "ano": 2025,
@@ -47,11 +43,9 @@
       "sha256_origem": "102f4a7a291f5630aba672d9c1938942c3a1fb623469c81dd4f1d1093e037a7f",
       "municipios": "municipios_co_2025.csv.gz",
       "temporal": "temporal_influenza_2025.csv.gz",
-      "sha256_municipios": "a591190f94a1dee9c6cfac63d5631322ed39f403c4c25553c22bdac78a7b664d",
-      "sha256_temporal": "5998e7bc58595bb0dd00ac34864d91cf53ea45a27a5033eabccde217fecaa9a6",
-      "origem": "https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/SRAG/2025/INFLUD25-16-11-2026.csv",
-      "notificacoes_cubo_nacional": 336435,
-      "compativel_com_cubo_nacional": true
+      "sha256_municipios": "05b58e2b90cfc3b735fde079f08cb44cddfe62a5871be1f8b5f168a751236b71",
+      "sha256_temporal": "9e777ce9d9223406fe10e455a7d93dec552783e84080631bdda30ef4fd77b833",
+      "origem": "https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/SRAG/2025/INFLUD25-16-11-2026.csv"
     },
     "2026": {
       "ano": 2026,
@@ -62,11 +56,9 @@
       "sha256_origem": "b51a10cd50151844551e628d4389c7b148fa5f4d55fa211072c6554a24b673fb",
       "municipios": "municipios_co_2026.csv.gz",
       "temporal": "temporal_influenza_2026.csv.gz",
-      "sha256_municipios": "ca7d12e8e0dd9edb8c2bb41a1d081f6af5f0da2f22206a4902241ca52f804f0c",
-      "sha256_temporal": "02a91c4a893218584cdb572c8ba29b06bc3443f2fc3febc7ba8a30b78b016da2",
-      "origem": "https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/SRAG/2026/INFLUD26-16-11-2026.csv",
-      "notificacoes_cubo_nacional": 248899,
-      "compativel_com_cubo_nacional": true
+      "sha256_municipios": "1dd782ba80e7a5eaa25fd15a119b6b625a79cfb357d37093dfe91c3338e02e3d",
+      "sha256_temporal": "5a761997e01cd165dffa46e113ab9cbc7c2c9290f6d63da6a9bbd2b8c3d7a19b",
+      "origem": "https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/SRAG/2026/INFLUD26-16-11-2026.csv"
     }
   },
   "escopos_temporais": [
@@ -88,5 +80,5 @@
     2025,
     2026
   ],
-  "gerado_em_utc": "2026-11-17T21:28:53+00:00"
+  "gerado_em_utc": "2026-11-17T19:21:48+00:00"
 }

@@ -1,29 +1,15 @@
-## Atualização V5
+# Publicação da versão 7
 
-- reforço visual dos mapas municipais com contorno estadual mais evidente;
-- zoom automático por UF na distribuição geográfica geral, preservando as delimitações estaduais;
-- nova aba **Co-detecções**;
-- ajustes de títulos/legendas para reduzir sobreposição;
-- manutenção da exportação de figuras em **800 dpi**.
+**Projeto completo:** inclui 2019–2026 nacional, complemento 2023–2026 de MT/MS/CO e malhas do IBGE.
 
-# Observatório SRAG Brasil — atualização V3
+1. Descompacte `VR_Brasil_Influenza_Mapas_V7_Completo.zip`.
+2. Entre na pasta `VR_Brasil_Influenza_Mapas_V7`.
+3. Para testar: `python3 -m pip install -r requirements.txt`, `python3 validar_publicacao.py` e `streamlit run streamlit_app.py`.
+4. Para publicar pelo navegador, acesse [VR_Brasil no GitHub](https://github.com/saracandidabio/VR_Brasil/upload/main). Envie os arquivos **de dentro** da pasta, inclusive as pastas `data/` e `.streamlit/` (pasta oculta). Não envie o ZIP como arquivo único. Verifique a raiz e confirme o commit.
+5. Acesse https://vrbrasil.streamlit.app/ e confira a nova aba **Influenza A e B**, as séries temporais e o mapa municipal de MT/MS com a escala de **Quantis**.
 
-**Acesse:** https://vrbrasil.streamlit.app/
+A opção de upload do site substitui arquivos com o mesmo nome/caminho, mas **não remove automaticamente arquivos antigos** que não estão no pacote. Use o editor web ou Git para excluir resíduos específicos. O arquivo `streamlit_app.py` atualizado remove a aba de co-detecções da navegação, sem necessidade de apagar os cubos históricos.
 
-Este ZIP é a versão consolidada para o repositório `VR_Brasil`.
-Contém toda a base agregada já preparada (2019–2026), complementar Centro-Oeste (2023–2026),
-malhas GeoJSON e código corrigido para mapas responsivos.
+**Não recalcule os dados apenas para corrigir o `KeyError` ou o contraste dos mapas.** O novo cálculo de classificação final sem resultado laboratorial ainda depende dos CSVs oficiais completos. Nenhuma contagem desse grupo foi inventada.
 
-**Não é necessário baixar os CSVs oficiais nem reexecutar o pipeline.**
-
-Leia `COMO_ATUALIZAR.md` para publicar. Não copie a pasta `.venv`.
-O novo arquivo `mapas_geo.py` é obrigatório para os mapas aparecerem.
-
-Em relação à versão anterior:
-- mapas das 27 UFs e dos municípios de MT/MS renderizados pela camada MapLibre;
-- zoom baseado nos polígonos das UFs selecionadas;
-- séries temporais comparativas por vírus, em escala nacional e Centro-Oeste;
-- rótulos da série cronológica e dos principais gráficos revisados.
-
-Para testar localmente: `python validar_publicacao.py` e
-`python -m pytest tests/ -q`. No Streamlit, o arquivo principal é `streamlit_app.py`.
+Se a aplicação na nuvem apresentar uma exceção, confira os logs do Streamlit e o arquivo `requirements.txt` publicado.

@@ -20,6 +20,7 @@ from matplotlib.cm import ScalarMappable
 from matplotlib.patches import Polygon as MPLPolygon
 from matplotlib.collections import PatchCollection
 from matplotlib.ticker import MaxNLocator
+from escala_municipal import escala
 
 COLORS = ['#23617D','#D68952','#287C73','#C75D67','#8F8FD0','#8B6B48','#648EA1','#c2a35f']
 MAP_COLORS = ['#e7f2f8','#b5d7e5','#7bacbf','#4088a6','#195a79','#103c53']
@@ -50,7 +51,7 @@ def _render_outline(ax, geo, *, edgecolor="#7d8790", linewidth=.65, alpha=.9):
 
 
 def _render_map(ax, geo, data_by_code, id_prop, label='Registros', *,
-                outline_geo=None, selected_outline_geo=None):
+                outline_geo=None, selected_outline_geo=None, escala_cor='Linear'):
     patches, values = [], []
     for feature in geo.get('features', []):
         code = str(feature['properties'][id_prop])
@@ -61,13 +62,15 @@ def _render_map(ax, geo, data_by_code, id_prop, label='Registros', *,
     if not patches:
         ax.text(.5,.5,'Nenhum polígono disponível',ha='center',transform=ax.transAxes)
         return
-    v_max = max(values) if values else 1
+    transformed, tickvals, ticklabels = escala(values, escala_cor)
+    v_max = max(transformed) if len(transformed) else 1
     norm = Normalize(vmin=0, vmax=max(v_max,1))
-    cmap = LinearSegmentedColormap.from_list('srag', MAP_COLORS)
+    # Branco para ausência de notificação; azul contrastante para municípios com valores.
+    cmap = LinearSegmentedColormap.from_list('srag', ['#ffffff','#a8d4e1','#649fb9','#246b91','#083a56'])
     collection = PatchCollection(patches, cmap=cmap, norm=norm,
-                                  linewidth=.38 if len(patches)>50 else .6,
-                                  edgecolor='#637b8a', antialiased=True)
-    collection.set_array(np.asarray(values))
+                                  linewidth=.68 if len(patches)>50 else .9,
+                                  edgecolor='#536b79', antialiased=True)
+    collection.set_array(np.asarray(transformed))
     ax.add_collection(collection)
     if outline_geo is not None:
         _render_outline(ax, outline_geo, edgecolor='#8a96a0', linewidth=.9, alpha=.92)
@@ -84,13 +87,15 @@ def _render_map(ax, geo, data_by_code, id_prop, label='Registros', *,
     ax.set_ylabel('Latitude (°)',fontsize=9)
     ax.grid(alpha=.13,linestyle='--',linewidth=.4)
     cbar=ax.figure.colorbar(ScalarMappable(norm=norm,cmap=cmap),ax=ax,fraction=.035,pad=.015,shrink=.83)
-    cbar.set_label(label,fontsize=9)
-    cbar.ax.tick_params(labelsize=8)
+    cbar.set_label(label+' · '+escala_cor.lower(),fontsize=9)
+    cbar.set_ticks(tickvals)
+    cbar.set_ticklabels(ticklabels)
+    cbar.ax.tick_params(labelsize=7)
 
 
 def mapa_png(geo, valores:pd.DataFrame, *, col_codigo='Código',col_valor='Registros',
              id_prop='codigo_sivep',titulo='SRAG · Distribuição municipal', dpi=800,
-             outline_geo=None, selected_outline_geo=None):
+             outline_geo=None, selected_outline_geo=None, escala_cor='Linear'):
     """Mapa sem dependência de navegador/cartografia externa; PNG com dpi embutido."""
     table=valores.copy()
     table[col_codigo]=table[col_codigo].astype('string').str.strip()
@@ -99,7 +104,8 @@ def mapa_png(geo, valores:pd.DataFrame, *, col_codigo='Código',col_valor='Regis
     with plt.rc_context({'font.family':'DejaVu Sans','font.size':9,
                          'axes.spines.top':False,'axes.spines.right':False}):
         fig,ax=plt.subplots(figsize=(8.2,6.3),facecolor='white')
-        _render_map(ax,geo,lookup,id_prop, outline_geo=outline_geo, selected_outline_geo=selected_outline_geo)
+        _render_map(ax,geo,lookup,id_prop, outline_geo=outline_geo,
+                    selected_outline_geo=selected_outline_geo, escala_cor=escala_cor)
         fig.suptitle(titulo,fontsize=13,fontweight='semibold',y=.985)
         fig.subplots_adjust(left=.09,right=.91,top=.93,bottom=.10)
         bio=BytesIO()

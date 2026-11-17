@@ -21,7 +21,7 @@
       "sha256_original": "b51a10cd50151844551e628d4389c7b148fa5f4d55fa211072c6554a24b673fb",
       "tamanho_original_bytes": 279335740,
       "arquivo_agregado": "cubo_srag_2026.csv.gz",
-      "sha256_agregado": "0f92b7acfdc1f5919200c3575407bea3352074ff3fc079a169ceddbe953c20d0",
+      "sha256_agregado": "06a5099e79d1f9dceb2e93e0eef4c710636b1762240f104565d1f8f44aa02586",
       "ano": 2026,
       "notificacoes": 248899,
       "grupos": 17786,
@@ -29,7 +29,7 @@
       "casos_obito_srag": 11669,
       "semanas_nao_informadas": 0,
       "campos_essenciais_ausentes": [],
-      "tamanho_arquivo_mb": 0.302
+      "tamanho_arquivo_mb": 0.265
     },
     "2019": {
       "origem": "portal_oficial",
@@ -38,7 +38,7 @@
       "sha256_original": "f6de547c1234e2de4d65f830606849a006346e50b32106bd635714665100134a",
       "tamanho_original_bytes": 51658150,
       "arquivo_agregado": "cubo_srag_2019.csv.gz",
-      "sha256_agregado": "308faada3e8edaa32d001ab1fb9e5d15b4947b2a1f5c87b2ce73c07a7255461e",
+      "sha256_agregado": "3e63e057479c639f636177f55dd99805a20702572e7029b101f4998db7a04eb0",
       "ano": 2019,
       "notificacoes": 48941,
       "grupos": 11063,
@@ -46,7 +46,7 @@
       "casos_obito_srag": 0,
       "semanas_nao_informadas": 0,
       "campos_essenciais_ausentes": [],
-      "tamanho_arquivo_mb": 0.099
+      "tamanho_arquivo_mb": 0.094
     },
     "2020": {
       "origem": "portal_oficial",
@@ -55,7 +55,7 @@
       "sha256_original": "75fd5cf13befd9712252f67fd92745d7c4638274db21b79a829b6682f7b67e50",
       "tamanho_original_bytes": 1259748695,
       "arquivo_agregado": "cubo_srag_2020.csv.gz",
-      "sha256_agregado": "5bda4c27ed4dfe818ecd31ace7ade3dbb688baeff1721697a0bfbd4262635b2e",
+      "sha256_agregado": "e35afeea57230b44c9ff91d34807339fe79d9b4a021722a60e6e737f411c25f4",
       "ano": 2020,
       "notificacoes": 1206920,
       "grupos": 22110,
@@ -63,7 +63,7 @@
       "casos_obito_srag": 0,
       "semanas_nao_informadas": 0,
       "campos_essenciais_ausentes": [],
-      "tamanho_arquivo_mb": 0.227
+      "tamanho_arquivo_mb": 0.218
     },
     "2021": {
       "origem": "portal_oficial",
@@ -72,7 +72,7 @@
       "sha256_original": "c64f07dbd4a95b85c29b1c6d2a97d560d65b0604a1b2bf91ed4bae5ad4c379cf",
       "tamanho_original_bytes": 1825519583,
       "arquivo_agregado": "cubo_srag_2021.csv.gz",
-      "sha256_agregado": "3ba8447bc97a6148e1c0ee02544d6cae88f6a1445bdc51681e5f693ed4224c2f",
+      "sha256_agregado": "be925ed8ab8b77f28b7a00e244dc886d641859b87b2745ba0fe8407a85435665",
       "ano": 2021,
       "notificacoes": 1745672,
       "grupos": 23978,
@@ -80,7 +80,7 @@
       "casos_obito_srag": 443524,
       "semanas_nao_informadas": 0,
       "campos_essenciais_ausentes": [],
-      "tamanho_arquivo_mb": 0.475
+      "tamanho_arquivo_mb": 0.43
     },
     "2022": {
       "origem": "portal_oficial",
@@ -89,7 +89,7 @@
       "sha256_original": "57250ce92b916b4f929f21e61c6ea35d3bbdaca3d8e7113c8959272292c8a320",
       "tamanho_original_bytes": 623026503,
       "arquivo_agregado": "cubo_srag_2022.csv.gz",
-      "sha256_agregado": "74cb58b2c47d8778841520f24d05bfa8eebb45113923c9365eb86f3f87f82d5c",
+      "sha256_agregado": "6e4766345605e91263997445fe9852c961e69ce014f7740f294c7d8e0aa7d71e",
       "ano": 2022,
       "notificacoes": 560577,
       "grupos": 21804,
@@ -97,7 +97,7 @@
       "casos_obito_srag": 92635,
       "semanas_nao_informadas": 0,
       "campos_essenciais_ausentes": [],
-      "tamanho_arquivo_mb": 0.364
+      "tamanho_arquivo_mb": 0.331
     },
     "2023": {
       "origem": "portal_oficial",
@@ -106,7 +106,7 @@
       "sha256_original": "639b748fb2838336bbaf0882608159790274734b21abdb02b303ee6076bb5e4a",
       "tamanho_original_bytes": 316216304,
       "arquivo_agregado": "cubo_srag_2023.csv.gz",
-      "sha256_agregado": "203d8e1d8695fdeef5601541828a86ccac3d6e322b079aec09633ad867d6ae8f",
+      "sha256_agregado": "c23a6166bff708e77768f8986673f0ac8e9fd915e4878ddb5808738381063cd2",
       "ano": 2023,
       "notificacoes": 279453,
       "grupos": 19993,
@@ -114,7 +114,7 @@
       "casos_obito_srag": 24944,
       "semanas_nao_informadas": 0,
       "campos_essenciais_ausentes": [],
-      "tamanho_arquivo_mb": 0.316
+      "tamanho_arquivo_mb": 0.284
     },
     "2024": {
       "origem": "portal_oficial",
@@ -123,7 +123,7 @@
       "sha256_original": "b516f6eae61203dae757c3fef0f46a8b61f9de202199c7b8e682212a0d94a8a4",
       "tamanho_original_bytes": 302245508,
       "arquivo_agregado": "cubo_srag_2024.csv.gz",
-      "sha256_agregado": "2827ea51503a782ffb04236ca66282b6524056bf7896a67bf9080809aa06e993",
+      "sha256_agregado": "7b071b4c87bf3faace22f92c1ffabf07c3abd9f40e40ebfa8aeb5a380049f29d",
       "ano": 2024,
       "notificacoes": 267986,
       "grupos": 20623,
@@ -131,7 +131,7 @@
       "casos_obito_srag": 20730,
       "semanas_nao_informadas": 0,
       "campos_essenciais_ausentes": [],
-      "tamanho_arquivo_mb": 0.334
+      "tamanho_arquivo_mb": 0.299
     },
     "2025": {
       "origem": "portal_oficial",
@@ -140,7 +140,7 @@
       "sha256_original": "102f4a7a291f5630aba672d9c1938942c3a1fb623469c81dd4f1d1093e037a7f",
       "tamanho_original_bytes": 382120493,
       "arquivo_agregado": "cubo_srag_2025.csv.gz",
-      "sha256_agregado": "c16357f302adb43c8dde336ac65e998446defd6f2491195aa4fc639f6f363e9a",
+      "sha256_agregado": "d74ec306fe2eacc77f563f072f7e9b90ce691f836a120af0d09f20ed6e9344f1",
       "ano": 2025,
       "notificacoes": 336435,
       "grupos": 21234,
@@ -148,7 +148,7 @@
       "casos_obito_srag": 23045,
       "semanas_nao_informadas": 0,
       "campos_essenciais_ausentes": [],
-      "tamanho_arquivo_mb": 0.368
+      "tamanho_arquivo_mb": 0.325
     }
   },
   "anos_disponiveis": [
@@ -163,5 +163,5 @@
   ],
   "notificacoes_total": 4694883,
   "completo_2019_2026": true,
-  "gerado_em_utc": "2026-11-17T21:26:43+00:00"
+  "gerado_em_utc": "2026-11-17T18:10:27+00:00"
 }

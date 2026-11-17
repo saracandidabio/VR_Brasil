@@ -79,6 +79,10 @@ def choropleth_map(
     camera_geo: dict | None = None,
     line_color: str = '#637b8a',
     line_width: float = 0.65,
+    extra_hover_cols: dict | None = None,
+    legend_ticks: list | None = None,
+    legend_labels: list | None = None,
+    legend_title: str = 'Registros',
     title: str = '',
 ):
     """Retorna uma figura maplibre, usando ligações explícitas com GeoJSON.
@@ -105,7 +109,7 @@ def choropleth_map(
         featureidkey=f'properties.{id_prop}',
         color=value_col,
         hover_name=name_col,
-        hover_data={code_col:False, value_col:':,'},
+        hover_data={code_col:False, value_col:False, **(extra_hover_cols or {})},
         color_continuous_scale=SCALE,
         labels={value_col:'Registros'},
         map_style=style,
@@ -114,8 +118,19 @@ def choropleth_map(
         title=title or None,
     )
     fig.update_traces(marker_line_color=line_color, marker_line_width=line_width, selector=dict(type='choroplethmap'))
+    # Em versões recentes do Plotly, hover_data do choropleth_map pode deixar
+    # o template sem valores: construir tooltip explicitamente a partir da UF/município.
+    hover_field = next(iter(extra_hover_cols)) if extra_hover_cols else value_col
+    lookup = a.set_index(code_col)[hover_field].to_dict()
+    for tr in fig.data:
+        if tr.type == 'choroplethmap':
+            tr.customdata = [[float(lookup.get(str(loc), 0))] for loc in tr.locations]
+            tr.hovertemplate = ('<b>%{hovertext}</b><br>' +
+                                ('Registros' if extra_hover_cols else legend_title) +
+                                ': %{customdata[0]:,.0f}<extra></extra>')
     fig.update_layout(
-        coloraxis_colorbar=dict(title='Registros', thickness=12, len=0.72),
+        coloraxis_colorbar=dict(title=legend_title, thickness=13, len=0.68,
+                                tickvals=legend_ticks, ticktext=legend_labels),
         font_family='Arial', font_size=12,
         margin=dict(l=0, r=0, t=36 if title else 0, b=0),
         paper_bgcolor='rgba(0,0,0,0)',

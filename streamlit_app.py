@@ -11,7 +11,7 @@ import streamlit as st
 from paginas_centro_oeste import load_complement, apply_filters, municipal_map, regional_page
 from mapas_geo import choropleth_map, geometry_valid
 from figuras_ui import chart as chart_figure
-from influenza_contexto import detail as influenza_detail, temporal_columns, select_influenza
+from influenza_contexto import temporal_columns, select_influenza
 
 BASE=Path(__file__).resolve().parent
 DATA=BASE/'data'
@@ -39,7 +39,7 @@ RESOLVED_CLASS2={
  'class2_sem_detalhe':'Sem detalhamento laboratorial'
 }
 PAGES=['Visão geral','Agentes virais','Séries temporais','Distribuição geográfica',
-       'Centro-Oeste · MT e MS','Co-detecções','Perfil epidemiológico','Explorador de dados','Métodos e auditoria']
+       'Centro-Oeste · MT e MS','Influenza A e B','Perfil epidemiológico','Explorador de dados','Métodos e auditoria']
 CAPITALS={
 'AC':(-9.97,-67.81),'AL':(-9.67,-35.74),'AP':(0.035,-51.07),
 'AM':(-3.12,-60.02),'BA':(-12.97,-38.50),'CE':(-3.72,-38.54),
@@ -226,8 +226,6 @@ def overall(df,focus):
         fig.update_layout(title='Distribuição por semana epidemiológica',xaxis_title='Ano – SE',yaxis_title='Notificações',hovermode='x unified',xaxis=dict(type='category',nticks=13,tickangle=-35),legend=dict(orientation='h',y=1.16,x=0))
         chart(fig,465)
     st.caption('Marcadores não são categorias mutuamente exclusivas. Resultado ausente não significa teste negativo. Não equivale a prevalência, incidência ou positividade entre testados.')
-    influenza_detail(CO_TIME,ufs_sel,expand=False,include_chart=True)
-    classification_without_lab_panel(df,compact=True)
 
 def virus_page(df,focus):
     title('Agentes virais','Detecções registradas no mesmo sistema de vigilância; não inferir espécie viral exclusivamente pela classificação final.')
@@ -248,8 +246,6 @@ def virus_page(df,focus):
                labels={'faixa_etaria':'Faixa etária','v_'+choice:'Notificações com detecção'},color_discrete_sequence=[C_GREEN],text='v_'+choice)
     chart(fig,380)
     st.caption('Codetecção: coexistência de marcadores em uma notificação; não necessariamente coinfecção ativa.')
-    influenza_detail(CO_TIME,ufs_sel,expand=True,include_chart=True)
-    classification_without_lab_panel(df,compact=True)
 
 def trend_page(df,focus):
     title('Séries temporais','Notificações por semana epidemiológica (SEM_PRI) e marcadores laboratoriais; 2019–2026.')
@@ -302,13 +298,15 @@ def trend_page(df,focus):
                 st.info('Não há tipagem disponível para os anos e UFs selecionados; nenhuma detecção foi imputada.')
             elif chartmode=='Linha do tempo contínua':
                 plot=px.line(melted,x='Ano – SE',y='Detecções',color='Alvo',
+                             category_orders={'Ano – SE':agg['Ano – SE'].tolist()},
                              title='Detecções por vírus e semana epidemiológica')
-                plot.update_layout(xaxis=dict(type='category',nticks=17,tickangle=-40),
+                plot.update_layout(xaxis=dict(type='category',categoryorder='array',
+                                   categoryarray=agg['Ano – SE'].tolist(),nticks=17,tickangle=-40),
                                    hovermode='x unified',legend=dict(orientation='h',y=1.13,x=0))
                 chart(plot,525)
             elif chartmode=='Temporadas sobrepostas':
                 single=st.selectbox('Alvo para comparar os anos',selected,
-                                    format_func=lambda x:VIRUSES[x],key='series_foco_ano')
+                                    format_func=lambda x:extended[x],key='series_foco_ano')
                 single_col=single if single in ('influenza_a','influenza_b') else f'v_{single}'
                 one=agg[['ano','semana',single_col]].rename(columns={single_col:'Detecções'}).dropna(subset=['Detecções']).copy()
                 one['Ano']=one.ano.astype(str)
@@ -326,7 +324,6 @@ def trend_page(df,focus):
             st.download_button('Exportar série semanal por agente (CSV)',
                 agg[['ano','semana',*selected_col]].to_csv(index=False).encode('utf-8-sig'),
                 'srag_serie_por_agente.csv','text/csv')
-    influenza_detail(CO_TIME,ufs_sel,expand=False,include_chart=False)
     yr=summarize(df,['ano'])[['ano','notificacoes','com_deteccao','obitos_srag']]
     with st.expander('Resumo anual dos registros'):
         st.dataframe(yr.sort_values('ano'),hide_index=True,use_container_width=True)
@@ -353,7 +350,6 @@ def geography(df,focus, selected_ufs, municipal_data, year_scope):
                         'Os anos 2019–2022 permanecem disponíveis no mapa estadual, '
                         'quando selecionados sem restringir a MT/MS.')
             if municipal_map(mapa, list(selected_ufs), focus, str(DATA), height=690):
-                influenza_detail(CO_TIME,ufs_sel,expand=False,include_chart=False)
                 return
         else:
             st.info('O mapa municipal está disponível para 2023–2026. '
@@ -417,86 +413,6 @@ def geography(df,focus, selected_ufs, municipal_data, year_scope):
     st.dataframe(a[['UF','notificacoes','Indicador','obitos_srag']].sort_values('Indicador',ascending=False),
                  hide_index=True,use_container_width=True)
     st.caption('A maior quantidade de notificações não significa necessariamente maior risco: as comparações dependem de população, intensidade de testagem e acesso aos serviços de saúde.')
-    influenza_detail(CO_TIME,ufs_sel,expand=False,include_chart=False)
-
-def codetections_page(df,focus):
-    title('Co-detecções','Notificações com dois ou mais grupos virais positivos na mesma ficha do SIVEP-Gripe.')
-    if no_rows(df):
-        return
-    total=metric(df,'notificacoes')
-    detected=metric(df,'com_deteccao')
-    codet=metric(df,'codeteccoes')
-    c1,c2,c3,c4=st.columns(4)
-    with c1:kpi('Co-detecções',number(codet),'≥2 grupos virais positivos')
-    with c2:kpi('% entre detecções virais',percent(codet,detected),'Co-detecções / com ≥1 marcador')
-    with c3:kpi('% entre notificações',percent(codet,total),'Co-detecções / todas as notificações')
-    with c4:kpi('Detecções virais simples',number(max(detected-codet,0)),'Com ≥1 marcador e sem codetecção')
-
-    weekly=summarize(df,['ano','semana'])
-    weekly=weekly[weekly['semana'].between(1,53)].sort_values(['ano','semana']).copy()
-    weekly['Ano – SE']=weekly['ano'].astype(str)+'-SE'+weekly['semana'].astype(str).str.zfill(2)
-    weekly['proporcao_codet']=(weekly['codeteccoes']/weekly['com_deteccao'].replace(0,pd.NA))*100
-
-    tab1,tab2,tab3=st.tabs(['Série temporal','Distribuição por UF','Perfil do recorte'])
-    with tab1:
-        fig=go.Figure()
-        fig.add_trace(go.Scatter(x=weekly['Ano – SE'],y=weekly['codeteccoes'],mode='lines',name='Co-detecções',line_color=C_PRIMARY))
-        fig.add_trace(go.Scatter(x=weekly['Ano – SE'],y=weekly['com_deteccao'],mode='lines',name='Com ≥1 marcador viral',line_color=C_SECONDARY,opacity=.5))
-        fig.update_layout(title='Co-detecções por semana epidemiológica',hovermode='x unified',
-                          xaxis=dict(type='category',nticks=15,tickangle=-40),
-                          xaxis_title='Ano – SE',yaxis_title='Notificações')
-        chart(fig,455)
-        share=px.line(weekly,x='Ano – SE',y='proporcao_codet',color_discrete_sequence=[C_GREEN],
-                      title='Participação das co-detecções entre as notificações com marcador viral')
-        share.update_layout(xaxis=dict(type='category',nticks=15,tickangle=-40),
-                            xaxis_title='Ano – SE',yaxis_title='% entre detecções')
-        chart(share,360)
-
-    with tab2:
-        byuf=summarize(df,['uf'])
-        byuf=byuf[byuf.uf.notna()].copy()
-        byuf['UF']=byuf['uf']
-        byuf['Co-detecções']=byuf['codeteccoes']
-        byuf['% entre detecções']=((byuf['codeteccoes']/byuf['com_deteccao'].replace(0,pd.NA))*100).round(1)
-        byuf=byuf.sort_values('Co-detecções',ascending=False)
-        left,right=st.columns([1.1,.9],gap='large')
-        with left:
-            shown=byuf.head(15)
-            fig=px.bar(shown,x='Co-detecções',y='UF',orientation='h',text='Co-detecções',
-                       color_discrete_sequence=[C_PRIMARY],title='15 UFs com mais co-detecções')
-            fig.update_traces(textposition='outside',cliponaxis=False)
-            fig.update_layout(xaxis_title='Registros',yaxis_title='',margin=dict(l=2,r=40,t=50,b=15))
-            chart(fig,510)
-        with right:
-            st.dataframe(byuf[['UF','Co-detecções','com_deteccao','% entre detecções']].rename(columns={'com_deteccao':'Com ≥1 marcador'}),
-                         hide_index=True,use_container_width=True,height=470)
-
-    with tab3:
-        left,right=st.columns(2,gap='large')
-        with left:
-            age=summarize(df,['faixa_etaria'])
-            age['faixa_etaria']=pd.Categorical(age.faixa_etaria,categories=AGES,ordered=True)
-            age=age.sort_values('faixa_etaria')
-            fig=px.bar(age,x='faixa_etaria',y='codeteccoes',color_discrete_sequence=[C_GREEN],
-                       title='Co-detecções por faixa etária',labels={'faixa_etaria':'Faixa etária','codeteccoes':'Registros'})
-            fig.update_xaxes(tickangle=-25)
-            chart(fig,395)
-        with right:
-            sex=summarize(df,['sexo'])
-            fig=px.pie(sex,names='sexo',values='codeteccoes',hole=.48,color_discrete_sequence=[C_PRIMARY,C_SECONDARY,C_GREEN],
-                       title='Co-detecções por sexo')
-            chart(fig,395)
-        inf_data, region = select_influenza(CO_TIME,ufs_sel)
-        if not inf_data.empty and 'influenza_a_b' in inf_data.columns:
-            st.subheader('Co-detecção específica de Influenza A e B')
-            ab=int(inf_data['influenza_a_b'].sum())
-            st.caption(f'Escopo disponível no complemento de influenza: **{region or "Brasil"}** · 2023–2026.')
-            st.metric('Influenza A + Influenza B na mesma notificação', number(ab))
-    st.caption('Co-detecção aqui significa presença de dois ou mais grupos virais marcados como positivos em uma mesma notificação. Isso não prova, por si só, coinfecção ativa, nem permite recuperar todos os pares virais específicos no snapshot agregado atual.')
-    influenza_detail(CO_TIME,ufs_sel,expand=False,include_chart=False)
-
-
-
 
 def classification_without_lab_panel(df, *, compact=False):
     """Mostra exclusivamente notificações CLASSI_FIN sem resultado registrado.
@@ -530,6 +446,124 @@ def classification_without_lab_panel(df, *, compact=False):
     st.caption('Influenza sem resultado laboratorial não pode ser reclassificada em INFA ou INFB '+
                'somente a partir de CLASSI_FIN=1. Testes negativos ou inconclusivos não entram neste grupo.')
 
+def influenza_page(df, municipal_data, years):
+    """Análises de influenza reunidas em uma página, sem caixas repetidas."""
+    title('Influenza A e B',
+          'Tipagem laboratorial, circulação temporal, subtipos, linhagens e classificações finais no SIVEP-Gripe.')
+    data, region = select_influenza(CO_TIME, ufs_sel)
+    st.caption('A/B e subtipos: complemento oficial de **2023–2026**, disponível para Brasil, '
+               'Centro-Oeste e, separadamente, MT e MS. Sem imputação dos anos anteriores ou de outras UFs.')
+    if data.empty:
+        st.warning('Não há tipagem A/B neste escopo de UF e período. Remova o filtro de UF '
+                   'ou selecione somente MT, MS, MT+MS ou todos os estados.')
+    else:
+        counts={col:int(data[col].sum()) for col in (
+            'influenza_a','influenza_b','influenza_sem_tipo','v_influenza') if col in data}
+        k1,k2,k3,k4=st.columns(4)
+        with k1:kpi('Influenza A (INFA)',number(counts.get('influenza_a',0)),'Marcador laboratorial')
+        with k2:kpi('Influenza B (INFB)',number(counts.get('influenza_b',0)),'Marcador laboratorial')
+        with k3:kpi('Influenza sem tipo',number(counts.get('influenza_sem_tipo',0)),'Registro laboratorial')
+        with k4:kpi('Influenza total (marcador)',number(counts.get('v_influenza',0)),'Não somar A e B sem verificar coexistência')
+        st.caption('Escopo: **'+region+'** · anos presentes: '+', '.join(str(x) for x in sorted(data.ano.unique()))+'.')
+        tab1,tab2,tab3,tab4=st.tabs([
+            'Evolução temporal','Subtipos e linhagens','Perfil epidemiológico','Distribuição espacial'])
+        with tab1:
+            series=data[data.semana.between(1,53)].groupby(['ano','semana'],observed=True)[
+                ['influenza_a','influenza_b','influenza_sem_tipo']].sum().reset_index().sort_values(['ano','semana'])
+            if series.empty:
+                st.info('Sem semanas válidas no recorte atual.')
+            else:
+                series['Ano – SE']=series.ano.astype(str)+'-SE'+series.semana.astype(str).str.zfill(2)
+                long=series.melt(['ano','semana','Ano – SE'],var_name='Agente',value_name='Detecções')
+                labels={'influenza_a':'Influenza A','influenza_b':'Influenza B',
+                        'influenza_sem_tipo':'Influenza sem tipo'}
+                long['Agente']=long.Agente.map(labels)
+                plot=px.line(long,x='Ano – SE',y='Detecções',color='Agente',
+                             category_orders={'Ano – SE':series['Ano – SE'].tolist()},
+                             color_discrete_map={'Influenza A':C_PRIMARY,'Influenza B':C_SECONDARY,
+                                                 'Influenza sem tipo':'#94a3a9'},
+                             title='Circulação semanal de influenza A e B')
+                plot.update_layout(hovermode='x unified',xaxis_title='Ano – semana epidemiológica',
+                                   xaxis=dict(type='category',nticks=16,tickangle=-38))
+                chart(plot,480)
+                choice=st.radio('Comparar temporadas de', ['influenza_a','influenza_b'],
+                                format_func=lambda k:labels[k],horizontal=True,key='v7_influenza_temporadas')
+                over=series[['ano','semana',choice]].rename(columns={choice:'Detecções'}).copy()
+                over['Ano']=over.ano.astype(str)
+                plot=px.line(over,x='semana',y='Detecções',color='Ano',
+                             title=labels[choice]+' · temporadas sobrepostas')
+                plot.update_layout(hovermode='x unified',xaxis=dict(dtick=4))
+                chart(plot,420)
+                st.download_button('Exportar dados semanais A/B (CSV)',
+                       series.to_csv(index=False).encode('utf-8-sig'),
+                       file_name='influenza_a_b_semanal.csv',mime='text/csv')
+        with tab2:
+            keys={'a_h1n1':'A(H1N1)pdm09','a_h3n2':'A(H3N2)',
+                  'a_nao_subtipada':'A sem subtipo definido','a_nao_subtipavel':'A não subtipável',
+                  'a_outro_subtipo':'A outro subtipo','b_victoria':'B/Victoria',
+                  'b_yamagata':'B/Yamagata','b_sem_linhagem':'B sem linhagem definida',
+                  'b_outra_linhagem':'B outra linhagem'}
+            vals=pd.DataFrame([{'Identificação':name,'Detecções':int(data[key].sum())}
+                               for key,name in keys.items() if key in data])
+            vals=vals.sort_values('Detecções',ascending=True)
+            plot=px.bar(vals,x='Detecções',y='Identificação',orientation='h',
+                        title='Subtipos de A e linhagens de B',color_discrete_sequence=[C_GREEN])
+            chart(plot,490)
+            st.caption('Subtipagem/linhagem requer resultado molecular positivo e informação específica. '
+                       'Campos ausentes não são interpretados como ausência de circulação.')
+        with tab3:
+            cols=[c for c in ('influenza_a','influenza_b') if c in data]
+            byage=data.groupby('faixa_etaria',observed=True)[cols].sum().reset_index()
+            age_long=byage.melt(id_vars=['faixa_etaria'],var_name='Agente',value_name='Detecções')
+            age_long['Agente']=age_long.Agente.map({'influenza_a':'Influenza A','influenza_b':'Influenza B'})
+            plot=px.bar(age_long,x='faixa_etaria',y='Detecções',color='Agente',barmode='group',
+                        title='Influenza A/B por faixa etária',
+                        color_discrete_map={'Influenza A':C_PRIMARY,'Influenza B':C_SECONDARY})
+            plot.update_xaxes(tickangle=-28)
+            chart(plot,405)
+            bysex=data.groupby('sexo',observed=True)[cols].sum().reset_index()
+            st.dataframe(bysex,hide_index=True,use_container_width=True)
+        with tab4:
+            st.caption('Mapas municipais A/B disponíveis para MT e MS, 2023–2026. '
+                       'A distribuição por município é anual, sem filtros de sexo, idade e semana.')
+            area=st.radio('Estado para mapa municipal',['MT','MS','MT + MS'],horizontal=True,
+                          key='v7_influenza_mapa_uf')
+            chosen=['MT','MS'] if area=='MT + MS' else [area]
+            keep=municipal_data[municipal_data.ano.isin(years)] if not municipal_data.empty else municipal_data
+            if keep.empty:
+                st.warning('Dados municipais ausentes para o período selecionado.')
+            else:
+                municipal_map(keep, chosen, 'influenza_a', str(DATA), height=650)
+    st.divider()
+    st.subheader('Classificações finais e ausência de resultados laboratoriais')
+    st.caption('CLASSI_FIN=1 significa SRAG por influenza, mas não especifica Influenza A ou B.')
+    k1,k2=st.columns(2)
+    with k1:kpi('Classificados como SRAG por influenza',number(metric(df,'classe_1')),
+                'Classificação final; não equivale a INFA/INFB')
+    with k2:kpi('Influenza com marcador laboratorial',number(metric(df,'v_influenza')),
+                'Pode envolver uma série histórica mais longa')
+    k='classe_influenza_sem_resultado_laboratorial'
+    if k in df.columns and df[k].notna().all():
+        st.metric('CLASSI_FIN = influenza, sem resultado de PCR/antígeno registrado',number(metric(df,k)))
+    else:
+        st.info('O cruzamento entre CLASSI_FIN e a ausência de resultado laboratorial '
+                'ainda não está disponível nos agregados publicados. É necessário reconstruir '
+                'os cubos a partir dos CSVs oficiais para obter a contagem. Não atribuímos zero.')
+    st.caption('O total classificado como influenza não deve ser somado às detecções laboratoriais, '
+               'pois os grupos podem se sobrepor. Uma classificação final sem resultado registrado '
+               'não define o tipo A ou B e não prova que não houve exame.')
+    with st.expander('Tabela de tipagem por ano e mês'):
+        if data.empty:
+            st.info('Não há dados de tipagem no escopo atual.')
+        else:
+            table=data.groupby(['ano','mes'],observed=True)[
+                ['influenza_a','influenza_b','influenza_sem_tipo']].sum().reset_index()
+            st.dataframe(table,hide_index=True,use_container_width=True)
+            st.download_button('Baixar tabela mensal de influenza',
+                table.to_csv(index=False).encode('utf-8-sig'),
+                file_name='influenza_a_b_mensal.csv',mime='text/csv')
+
+
 def epidemiology(df,focus):
     title('Perfil epidemiológico','Distribuição das notificações por sexo, idade, classificação final e desfechos registrados.')
     if no_rows(df):return
@@ -546,7 +580,6 @@ def epidemiology(df,focus):
     st.subheader('Classificação final da SRAG')
     count=pd.DataFrame([{'Classificação':label,'Registros':metric(df,f'classe_{k}')} for k,label in CLASS.items()])
     fig=px.bar(count,x='Classificação',y='Registros',text='Registros',color_discrete_sequence=[C_PRIMARY]);chart(fig,355)
-    classification_without_lab_panel(df)
 
     if all(col in df.columns for col in RESOLVED_CLASS2):
         st.subheader('Detalhamento dos registros classificados como “Outro vírus respiratório”')
@@ -565,7 +598,6 @@ def epidemiology(df,focus):
     with c2:kpi('UTI registrada',number(metric(df,'uti') if focus=='todos' else metric(df,f'uti_{focus}')),'Campo UTI = 1')
     with c3:kpi('Óbito por SRAG',number(metric(df,'obitos_srag') if focus=='todos' else metric(df,f'obito_{focus}')),'Evolução = 2')
     st.caption('Indicadores de desfecho não foram ajustados por atraso de encerramento; estimativas de letalidade exigem análise específica e denominadores apropriados. Classificação final é distinta dos marcadores laboratoriais.')
-    influenza_detail(CO_TIME,ufs_sel,expand=False,include_chart=False,include_age=True)
 
 def explorer(df,focus):
     title('Explorador de dados','Tabela agregada exportável; nenhuma linha representa um paciente individual.')
@@ -579,16 +611,6 @@ def explorer(df,focus):
     st.dataframe(out,use_container_width=True,hide_index=True,height=470)
     st.download_button('Exportar tabela CSV',data=out.to_csv(index=False).encode('utf-8-sig'),
                        file_name='srag_brasil_agregado.csv',mime='text/csv')
-    influenza_detail(CO_TIME,ufs_sel,expand=False,include_chart=False)
-    sub,region=select_influenza(CO_TIME,ufs_sel)
-    if not sub.empty:
-        extra=sub.groupby(['ano','semana'],observed=True)[['influenza_a','influenza_b',
-                    'influenza_sem_tipo']].sum().reset_index()
-        with st.expander('Explorar tabela de influenza A/B por ano e semana'):
-            st.caption('Fonte complementar 2023–2026 · '+region+'. Não estratificada por UF fora de MT/MS.')
-            st.dataframe(extra,use_container_width=True,hide_index=True)
-            st.download_button('Baixar tipagem A/B (CSV)',extra.to_csv(index=False).encode('utf-8-sig'),
-                              file_name='srag_influenza_a_b.csv',mime='text/csv')
 
 def methods(meta):
     title('Métodos e auditoria','Origem, recortes temporais e limitações de interpretação do snapshot publicado.')
@@ -625,7 +647,6 @@ def methods(meta):
     st.dataframe(pd.DataFrame(a),use_container_width=True,hide_index=True)
     with st.expander('Metadados completos, SHA256 e arquivos originais'):
         st.json(meta,expanded=False)
-    influenza_detail(CO_TIME,ufs_sel,expand=False,include_chart=False)
 
 if not (DATA/'manifest.json').exists():
     st.error('Dados preparados não encontrados. Execute localmente `python construir_base.py --todos`, inclua a pasta data/ no GitHub e publique.')
@@ -686,7 +707,7 @@ elif page==PAGES[1]:virus_page(filtered,focus)
 elif page==PAGES[2]:trend_page(filtered,focus)
 elif page==PAGES[3]:geography(filtered,focus,ufs_sel,CO_MUN,years)
 elif page==PAGES[4]:regional_page(filtered,CO_MUN,CO_TIME,years,ufs_sel,focus,str(DATA))
-elif page==PAGES[5]:codetections_page(filtered,focus)
+elif page==PAGES[5]:influenza_page(filtered,CO_MUN,years)
 elif page==PAGES[6]:epidemiology(filtered,focus)
 elif page==PAGES[7]:explorer(filtered,focus)
 else:methods(META)

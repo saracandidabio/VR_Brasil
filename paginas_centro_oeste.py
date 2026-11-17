@@ -13,6 +13,7 @@ import streamlit as st
 from mapas_geo import choropleth_map, geometry_valid
 from figuras_ui import chart as chart_figure
 from exportacao import mapa_png
+from escala_municipal import escala
 
 UF_DETAIL = ('MT','MS')
 CO_UFS = ('MT','MS','GO','DF')
@@ -120,7 +121,7 @@ def municipal_map(mun: pd.DataFrame, ufs: list[str], agent: str, data_dir: str, 
         'v_sars_cov_2':'SARS-CoV-2',
         'v_rinovirus':'Rinovírus',
     }
-    initial = 'v_'+agent if agent!='todos' and 'v_'+agent in opts else 'notificacoes'
+    initial = agent if agent in opts else ('v_'+agent if agent!='todos' and 'v_'+agent in opts else 'notificacoes')
     choices=[x for x in opts if x in mun.columns]
     metric=st.selectbox('Indicador no mapa municipal',choices,
         index=choices.index(initial) if initial in choices else 0,
@@ -141,34 +142,60 @@ def municipal_map(mun: pd.DataFrame, ufs: list[str], agent: str, data_dir: str, 
                    f'registros com município estão representados. Confira os códigos.')
     st.caption(f'Municípios do IBGE: {len(polys)} · indicadores mapeados: {num(mapped)} · '
                'município de residência (CO_MUN_RES) · contornos estaduais reforçados no mapa estático')
-    style=st.radio('Visualização do mapa',
-        ['Mapa estático (compatível com Safari)','Mapa interativo'],
-        horizontal=True,key='v4_municipal_tipo')
+    optcol1,optcol2=st.columns(2)
+    with optcol1:
+        method=st.selectbox('Escala das cores',
+            ['Quantis','Raiz quadrada','Linear'],index=0,key='v7_cor_municipal',
+            help='Quantis distribui os municípios em faixas com contagens próximas; '                 'raiz quadrada reduz a influência das cidades maiores; linear apresenta valores absolutos.')
+    with optcol2:
+        style=st.radio('Visualização do mapa',
+            ['Mapa estático (compatível com Safari)','Mapa interativo'],
+            horizontal=False,key='v4_municipal_tipo')
+    st.caption('A escala de cores muda apenas a visualização. Os números de registros não são alterados.')
     geo={'type':'FeatureCollection','features':polys}
     outline_geo, selected_outline_geo = load_state_outlines(data_dir, tuple(ufs))
     titulo=f'{opts[metric]} · {" + ".join(ufs)}'
     if style.startswith('Mapa estático'):
         preview=mapa_png(geo,df,col_codigo='Código',col_valor='Registros',
                          id_prop='codigo_sivep',titulo=titulo,dpi=140,
-                         outline_geo=outline_geo, selected_outline_geo=selected_outline_geo)
-        st.image(preview,caption='Malha municipal IBGE · contagens absolutas',use_container_width=True)
-        signature=hashlib.sha256((titulo+df.to_csv(index=False)).encode()).hexdigest()[:16]
-        key='v4_mapa_municipal_800'
-        with st.expander('Exportar mapa municipal · PNG 800 dpi'):
-            if st.button('Preparar mapa PNG 800 dpi',key='v4_prepare_municipal'):
+                         outline_geo=outline_geo, selected_outline_geo=selected_outline_geo,
+                         escala_cor=method)
+        st.image(preview,caption='Malha municipal IBGE · intensidade visual por '+method.lower(),
+                 use_container_width=True)
+    else:
+        frame_map=df.copy()
+        transformed,ticks,labels=escala(frame_map['Registros'],method)
+        frame_map['Intensidade']=transformed
+        fig=choropleth_map(frame_map,geo,code_col='Código',id_prop='codigo_sivep',
+              name_col='Município',value_col='Intensidade',
+              extra_hover_cols={'Registros':':,'},legend_ticks=ticks,
+              legend_labels=labels,legend_title='Registros',
+              scope='MT+MS' if set(ufs)=={'MT','MS'} else ufs[0],
+              auto_camera=True,style='carto-positron', line_color='#506471', line_width=1.05)
+        fig.update_layout(height=height,margin=dict(l=0,r=8,t=10,b=10))
+        st.plotly_chart(fig,use_container_width=True,
+                 config={'displaylogo':False,'scrollZoom':False,'modeBarButtonsToRemove':['toImage']})
+    signature=hashlib.sha256((titulo+method+df.to_csv(index=False)).encode()).hexdigest()[:16]
+    key='v7_mapa_municipal_800'
+    with st.expander('Exportar mapa municipal · PNG 800 dpi'):
+        if st.button('Preparar mapa PNG 800 dpi',key='v7_prepare_municipal'):
+            with st.spinner('Desenhando mapa em alta resolução...'):
                 st.session_state[key]=(signature,mapa_png(geo,df,
                       col_codigo='Código',col_valor='Registros',id_prop='codigo_sivep',titulo=titulo,dpi=800,
-                      outline_geo=outline_geo, selected_outline_geo=selected_outline_geo))
-            stored=st.session_state.get(key)
-            if stored and stored[0]==signature:
-                st.download_button('Baixar mapa · 800 dpi',data=stored[1],
-                                   file_name='srag_municipios_'+"_".join(ufs)+'_800dpi.png',mime='image/png')
-    else:
-        fig=choropleth_map(df,geo,code_col='Código',id_prop='codigo_sivep',
-              name_col='Município',value_col='Registros',
-              scope='MT+MS' if set(ufs)=={'MT','MS'} else ufs[0],
-              auto_camera=True,style='carto-positron', line_color='#596c79', line_width=0.8)
-        chart(fig,height)
+                      outline_geo=outline_geo, selected_outline_geo=selected_outline_geo,escala_cor=method))
+        stored=st.session_state.get(key)
+        if stored and stored[0]==signature:
+            st.download_button('Baixar mapa · 800 dpi',data=stored[1],
+                   file_name='srag_municipios_'+"_".join(ufs)+'_800dpi.png',mime='image/png',
+                   key='v7_download_municipal')
+    ranking=df.sort_values('Registros',ascending=False).head(18).copy()
+    if not ranking.empty:
+        fig=px.bar(ranking.sort_values('Registros'),x='Registros',y='Município',
+                   orientation='h',title='Municípios com maior número de registros',
+                   color_discrete_sequence=[BLUE],text='Registros')
+        fig.update_traces(textposition='outside',cliponaxis=False)
+        fig.update_layout(xaxis_title='Notificações',yaxis_title='',margin=dict(l=8,r=46,t=40,b=25))
+        chart(fig,460)
     unknown=count(frame[frame.municipio.eq('Não informado')],metric)
     st.caption(f'{num(unknown)} registros sem município válido não foram localizados. '
                'Este mapa municipal é anual (2023–2026); os filtros de semana, sexo e idade '
