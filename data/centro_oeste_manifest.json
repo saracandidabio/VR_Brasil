@@ -1,0 +1,92 @@
+{
+  "versao": "2.0",
+  "descricao": "Dados SIVEP-Gripe, complemento geográfico e tipagem de influenza",
+  "fonte": "https://dadosabertos.saude.gov.br/dataset/srag-2019-a-2026",
+  "unidade": "notificações; sem deduplicação interna do SIVEP",
+  "inicio_sintomas": "DT_SIN_PRI para mês, SEM_PRI para semana; mês zero indica inválido/incompatível",
+  "residencia": "CO_MUN_RES e SG_UF, não município de notificação",
+  "tipagem": "somente marcadores positivos de PCR e teste antigênico com tipo 1=A, 2=B",
+  "subtipagem": "PCR_FLUASU: 1=H1N1pdm09, 2=H3N2; PCR_FLUBLI: 1=Victoria, 2=Yamagata",
+  "anos": {
+    "2023": {
+      "ano": 2023,
+      "notificacoes_brasil": 279453,
+      "notificacoes_co": 28006,
+      "linhas_municipios_agregadas": 453,
+      "origem_arquivo": "INFLUD23-23-03-2026.csv",
+      "sha256_origem": "639b748fb2838336bbaf0882608159790274734b21abdb02b303ee6076bb5e4a",
+      "municipios": "municipios_co_2023.csv.gz",
+      "temporal": "temporal_influenza_2023.csv.gz",
+      "sha256_municipios": "a403e5eeca5e7b9e1ebcacd939ce17d9e300464c375ca171857dc62efacb3838",
+      "sha256_temporal": "c5bcbff70dd8daa399ccc98f2ed2e7fe10bb4b8d8a42b0b5f0a84d03e45da9af",
+      "origem": "https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/SRAG/2023/INFLUD23-23-03-2026.csv",
+      "notificacoes_cubo_nacional": 279453,
+      "compativel_com_cubo_nacional": true
+    },
+    "2024": {
+      "ano": 2024,
+      "notificacoes_brasil": 267986,
+      "notificacoes_co": 26350,
+      "linhas_municipios_agregadas": 441,
+      "origem_arquivo": "INFLUD24-23-03-2026.csv",
+      "sha256_origem": "b516f6eae61203dae757c3fef0f46a8b61f9de202199c7b8e682212a0d94a8a4",
+      "municipios": "municipios_co_2024.csv.gz",
+      "temporal": "temporal_influenza_2024.csv.gz",
+      "sha256_municipios": "461aab4d0cffb73b04a7201b0848d68829c82291dc9a3d1d7230871d79a92e83",
+      "sha256_temporal": "c6aff9faa45c77a19b6626bd5113a73da382b9130c8d7e4df928e3c3aa5389ad",
+      "origem": "https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/SRAG/2024/INFLUD24-23-03-2026.csv",
+      "notificacoes_cubo_nacional": 267986,
+      "compativel_com_cubo_nacional": true
+    },
+    "2025": {
+      "ano": 2025,
+      "notificacoes_brasil": 336435,
+      "notificacoes_co": 37237,
+      "linhas_municipios_agregadas": 460,
+      "origem_arquivo": "INFLUD25-16-11-2026.csv",
+      "sha256_origem": "102f4a7a291f5630aba672d9c1938942c3a1fb623469c81dd4f1d1093e037a7f",
+      "municipios": "municipios_co_2025.csv.gz",
+      "temporal": "temporal_influenza_2025.csv.gz",
+      "sha256_municipios": "a591190f94a1dee9c6cfac63d5631322ed39f403c4c25553c22bdac78a7b664d",
+      "sha256_temporal": "5998e7bc58595bb0dd00ac34864d91cf53ea45a27a5033eabccde217fecaa9a6",
+      "origem": "https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/SRAG/2025/INFLUD25-16-11-2026.csv",
+      "notificacoes_cubo_nacional": 336435,
+      "compativel_com_cubo_nacional": true
+    },
+    "2026": {
+      "ano": 2026,
+      "notificacoes_brasil": 248899,
+      "notificacoes_co": 27026,
+      "linhas_municipios_agregadas": 444,
+      "origem_arquivo": "INFLUD26-16-11-2026.csv",
+      "sha256_origem": "b51a10cd50151844551e628d4389c7b148fa5f4d55fa211072c6554a24b673fb",
+      "municipios": "municipios_co_2026.csv.gz",
+      "temporal": "temporal_influenza_2026.csv.gz",
+      "sha256_municipios": "ca7d12e8e0dd9edb8c2bb41a1d081f6af5f0da2f22206a4902241ca52f804f0c",
+      "sha256_temporal": "02a91c4a893218584cdb572c8ba29b06bc3443f2fc3febc7ba8a30b78b016da2",
+      "origem": "https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/SRAG/2026/INFLUD26-16-11-2026.csv",
+      "notificacoes_cubo_nacional": 248899,
+      "compativel_com_cubo_nacional": true
+    }
+  },
+  "escopos_temporais": [
+    "Brasil",
+    "Centro-Oeste",
+    "MT",
+    "MS"
+  ],
+  "ufs_municipios": [
+    "MT",
+    "MS",
+    "GO",
+    "DF"
+  ],
+  "granularidade_municipal": "município + UF + ano; sem idade, sexo, semana ou mês por minimização dos dados",
+  "anos_disponiveis": [
+    2023,
+    2024,
+    2025,
+    2026
+  ],
+  "gerado_em_utc": "2026-11-17T21:28:53+00:00"
+}
