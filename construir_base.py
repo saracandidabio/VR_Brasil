@@ -62,7 +62,8 @@ CLASSIFICATIONS = {'1':'SRAG por influenza','2':'SRAG por outro vírus respirat�
                    '3':'SRAG por outro agente etiológico','4':'SRAG não especificada',
                    '5':'SRAG por COVID-19'}
 DIM = ['ano','semana','uf','sexo','faixa_etaria']
-METRICS = ['notificacoes','com_deteccao','codeteccoes','hospitalizados','uti','obitos_srag','desfecho_conhecido'] + [f'v_{v}' for v in VIRUSES] + [f'obito_{v}' for v in VIRUSES] + [f'uti_{v}' for v in VIRUSES] + [f'classe_{i}' for i in range(1,6)]
+RESOLVED_CLASS2 = ['class2_sem_detalhe','class2_codeteccao','class2_outros_virus_nao_especificados'] + [f'class2_{v}' for v in VIRUSES if v!='outros_virus']
+METRICS = ['notificacoes','com_deteccao','codeteccoes','hospitalizados','uti','obitos_srag','desfecho_conhecido'] + [f'v_{v}' for v in VIRUSES] + [f'obito_{v}' for v in VIRUSES] + [f'uti_{v}' for v in VIRUSES] + [f'classe_{i}' for i in range(1,6)] + RESOLVED_CLASS2
 
 
 def session() -> requests.Session:
@@ -174,6 +175,18 @@ def make_metrics(raw:pd.DataFrame,year:int)->pd.DataFrame:
         out[f'uti_{virus}']=(flag&uti).astype('int8')
     classifications=col(raw,'CLASSI_FIN')
     for cls in range(1,6):out[f'classe_{cls}']=classifications.eq(str(cls)).fillna(False).astype('int8')
+
+    # Resolve parte das notificações classificadas genericamente como
+    # 'outro vírus respiratório' (CLASSI_FIN=2) usando os marcadores laboratoriais.
+    is_class2 = classifications.eq('2').fillna(False)
+    viral_count = sum(flags[v].astype('int8') for v in VIRUSES)
+    out['class2_sem_detalhe'] = (is_class2 & viral_count.eq(0)).astype('int8')
+    out['class2_codeteccao'] = (is_class2 & viral_count.ge(2)).astype('int8')
+    out['class2_outros_virus_nao_especificados'] = (is_class2 & viral_count.eq(1) & flags['outros_virus']).astype('int8')
+    for virus in VIRUSES:
+        if virus == 'outros_virus':
+            continue
+        out[f'class2_{virus}'] = (is_class2 & viral_count.eq(1) & flags[virus]).astype('int8')
     return out
 
 
@@ -285,8 +298,13 @@ def main(argv=None):
     ap.add_argument('--preservar-brutos',action='store_true',help='Manter CSVs originais fora do GitHub')
     ap.add_argument('--reprocessar',action='store_true',help='Reprocessar anos mesmo se já estiverem preparados')
     ap.add_argument('--sem-malha',action='store_true',help='Não consultar a API do IBGE para os polígonos estaduais')
+    ap.add_argument('--apenas-malha',action='store_true',help='Baixar somente a malha do IBGE; sem reconstruir os anos de SRAG')
     args=ap.parse_args(argv)
     DATA.mkdir(exist_ok=True,parents=True)
+    if args.apenas_malha:
+        download_uf_geojson(session())
+        print('Malha pronta. Inclua data/malha_uf.geojson no repositório GitHub.',flush=True)
+        return
     meta_path=DATA/'manifest.json'
     metadata=json.loads(meta_path.read_text()) if meta_path.exists() else {
         'versao':'1.0','sistema':'SIVEP-Gripe — SRAG',

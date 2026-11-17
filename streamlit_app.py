@@ -8,6 +8,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from paginas_centro_oeste import load_complement, apply_filters, municipal_map, regional_page
 
 BASE=Path(__file__).resolve().parent
 DATA=BASE/'data'
@@ -21,8 +22,21 @@ AGES=['< 2 anos','2 a 4 anos','5 a 9 anos','10 a 19 anos','20 a 29 anos',
       '30 a 39 anos','40 a 49 anos','50 a 59 anos','≥ 60 anos','Não informado']
 CLASS={1:'Influenza',2:'Outro vírus respiratório',3:'Outro agente etiológico',
        4:'Não especificada',5:'COVID-19'}
+RESOLVED_CLASS2={
+ 'class2_influenza':'Influenza',
+ 'class2_sars_cov_2':'SARS-CoV-2',
+ 'class2_vsr':'Vírus sincicial respiratório (VSR)',
+ 'class2_parainfluenza':'Parainfluenza',
+ 'class2_adenovirus':'Adenovírus',
+ 'class2_metapneumovirus':'Metapneumovírus',
+ 'class2_bocavirus':'Bocavírus',
+ 'class2_rinovirus':'Rinovírus',
+ 'class2_outros_virus_nao_especificados':'Outros vírus não especificados',
+ 'class2_codeteccao':'Codetecção / múltiplos vírus',
+ 'class2_sem_detalhe':'Sem detalhamento laboratorial'
+}
 PAGES=['Visão geral','Agentes virais','Séries temporais','Distribuição geográfica',
-       'Perfil epidemiológico','Explorador de dados','Métodos e auditoria']
+       'Centro-Oeste · MT e MS','Perfil epidemiológico','Explorador de dados','Métodos e auditoria']
 CAPITALS={
 'AC':(-9.97,-67.81),'AL':(-9.67,-35.74),'AP':(0.035,-51.07),
 'AM':(-3.12,-60.02),'BA':(-12.97,-38.50),'CE':(-3.72,-38.54),
@@ -35,14 +49,101 @@ CAPITALS={
 'SP':(-23.55,-46.63),'SE':(-10.91,-37.07),'TO':(-10.18,-48.33)}
 C_PRIMARY='#23617D'; C_SECONDARY='#D68952'; C_GREEN='#287C73'
 
-st.set_page_config(page_title='SRAG Brasil | Observatório de Vírus Respiratórios',page_icon='🫁',layout='wide')
+st.set_page_config(
+    page_title='SRAG Brasil | Observatório de Vírus Respiratórios',
+    page_icon='🫁', layout='wide', initial_sidebar_state='expanded'
+)
 st.markdown('''<style>
-.block-container {padding-top:1.55rem;max-width:1460px}
-[data-testid="stMetric"] {background:#f1f6f8;border:1px solid #dce9ee;border-radius:10px;padding:14px}
-[data-testid="stMetricValue"] {color:#123d52}
-[data-testid="stSidebar"] {border-right:1px solid #e5ebef}
-.captioned {color:#587080;font-size:.9rem}
-</style>''',unsafe_allow_html=True)
+/* Identidade editorial: legível no tema claro ou escuro. */
+.block-container {padding-top:1.25rem;max-width:1510px;padding-bottom:2.5rem}
+[data-testid="stSidebar"] {border-right:1px solid rgba(122,149,164,.25)}
+h1,h2,h3 {letter-spacing:-.025em}
+.srag-hero {padding:1.35rem 1.6rem 1.2rem;border-radius:16px;
+ background:linear-gradient(115deg,#123b50 0%,#155a72 68%,#18737d 100%);
+ border:1px solid #396d80;color:#f7fbff;
+ box-shadow:0 6px 25px rgba(18,48,65,.10);margin:.15rem 0 .7rem}
+.srag-eyebrow {font-size:.71rem;letter-spacing:.13em;text-transform:uppercase;
+ font-weight:750;color:#bde0e9;margin-bottom:.4rem}
+.srag-title {font-size:clamp(1.5rem,2.4vw,2.15rem);font-weight:750;
+ letter-spacing:-.035em;line-height:1.2;margin:0 0 .35rem}
+.srag-subtitle {color:#e2eef2;font-size:.95rem;line-height:1.6;max-width:1000px}
+.srag-meta {display:flex;flex-wrap:wrap;gap:.45rem;margin-top:1rem}
+.srag-meta span {border:1px solid rgba(212,238,243,.38);border-radius:20px;
+ padding:.22rem .65rem;color:#e7f4f6;font-size:.75rem}
+.srag-credits {border-left:3px solid #24869c;padding:.65rem 1rem;
+ background:rgba(116,166,186,.08);border-radius:0 10px 10px 0;
+ margin:.35rem 0 .55rem;line-height:1.52;font-size:.87rem}
+.srag-credits strong {font-weight:750}
+.srag-credits a {color:inherit;text-decoration:underline;text-decoration-color:#48a2bb;text-underline-offset:3px}
+.srag-source {font-size:.83rem;opacity:.86;line-height:1.58;padding:0 0 .2rem}
+.srag-source a {color:inherit;text-decoration:underline;text-underline-offset:3px}
+.srag-kpi {min-height:114px;padding:1rem 1.05rem;border-radius:13px;
+ color:#f9fcff!important;border:1px solid #2a556d;
+ background:linear-gradient(155deg,#143448,#1b5269);box-shadow:0 3px 10px rgba(9,33,49,.09)}
+.srag-kpi .kpi-label {color:#c6e1e9!important;font-size:.83rem;line-height:1.3;
+ font-weight:650;min-height:2.1em}
+.srag-kpi .kpi-value {color:#fff!important;font-size:clamp(1.4rem,2vw,2rem);
+ font-weight:750;letter-spacing:-.035em;font-variant-numeric:tabular-nums;
+ line-height:1.28;margin-top:.15rem}
+.srag-kpi .kpi-detail {color:#d1e5eb!important;font-size:.72rem;margin-top:.25rem}
+[data-testid="stMetric"] {background:#143448!important;border:1px solid #2a556d;
+ border-radius:13px!important;padding:15px!important}
+[data-testid="stMetric"] [data-testid="stMetricLabel"] * {color:#c6e1e9!important;font-weight:650!important}
+[data-testid="stMetric"] [data-testid="stMetricValue"] * {color:#fff!important}
+[data-testid="stMetric"] [data-testid="stMetricDelta"] * {color:#d1e5eb!important}
+[data-testid="stPlotlyChart"] {border:1px solid rgba(130,154,167,.14);border-radius:12px;padding:.3rem}
+@media(max-width:800px) {.srag-hero {padding:1.05rem}.srag-title{font-size:1.55rem}}
+</style>''', unsafe_allow_html=True)
+
+
+def kpi(label: str, value: str, detail: str = '') -> None:
+    """Cartão com contraste fixo, inclusive no tema escuro do navegador."""
+    from html import escape
+    extra = f'<div class="kpi-detail">{escape(detail)}</div>' if detail else ''
+    st.markdown(
+        '<div class="srag-kpi">'
+        f'<div class="kpi-label">{escape(label)}</div>'
+        f'<div class="kpi-value">{escape(str(value))}</div>{extra}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def header(meta: dict, available_years: list[int]) -> None:
+    """Créditos mantidos conforme o dashboard Orthoherpes da autora."""
+    from html import escape
+    start = min(available_years)
+    end = max(available_years)
+    snapshot = str(meta.get('gerado_em_utc', 'não informada'))[:10]
+    status = 'Série 2019–2026 disponível' if meta.get('completo_2019_2026') else 'Base parcial'
+    st.markdown(f'''
+<div class="srag-hero">
+  <div class="srag-eyebrow">Vigilância epidemiológica · Brasil</div>
+  <div class="srag-title">Observatório de Vírus Respiratórios</div>
+  <div class="srag-subtitle">Síndrome Respiratória Aguda Grave (SRAG) ·
+  Análise de notificações, agentes virais, distribuição espacial, perfil epidemiológico
+  e evolução temporal no território brasileiro.</div>
+  <div class="srag-meta"><span>Fonte: SIVEP-Gripe / Ministério da Saúde</span>
+  <span>Arquivos: {start}–{end}</span><span>{status}</span>
+  <span>Preparação: {escape(snapshot)}</span></div>
+</div>''', unsafe_allow_html=True)
+    st.markdown('''
+<div class="srag-credits"><strong>Idealizado por Sara Cândida Ferreira dos Santos</strong>
+  · Mestranda em Bioinformática – UFMG<br>
+  Bióloga – Universidade Federal de Minas Gerais · Técnica em Biotecnologia – COLTEC/UFMG<br>
+  <a href="http://lattes.cnpq.br/5384262726323885" target="_blank">Currículo Lattes</a>
+  &nbsp;·&nbsp; <a href="https://www.linkedin.com/in/sara-cândida-santos/" target="_blank">LinkedIn</a>
+  &nbsp;·&nbsp; <a href="mailto:saracandida@ufmg.br">Contato</a>
+</div>''', unsafe_allow_html=True)
+    st.markdown('''
+<div class="srag-source"><strong>Sobre a base de dados.</strong>
+O <strong>SIVEP-Gripe</strong> (Sistema de Informação da Vigilância Epidemiológica da Gripe)
+reúne registros da vigilância de <strong>SRAG hospitalizada e de óbitos por SRAG, independentemente de hospitalização</strong>.
+Os dados oficiais divulgados pelo Ministério da Saúde permitem explorar informações demográficas,
+clínicas, laboratoriais e de desfecho. Este painel utiliza exclusivamente arquivos públicos de SRAG
+já tratados e agregados para consulta; não representa todos os casos de infecção respiratória no país.
+<a href="https://dadosabertos.saude.gov.br/dataset/srag-2019-a-2026" target="_blank">Fonte: Portal de Dados Abertos do SUS</a>.
+</div>''', unsafe_allow_html=True)
+
 
 @st.cache_data(show_spinner=False)
 def manifest():
@@ -100,10 +201,10 @@ def overall(df,focus):
     title('Visão geral','Indicadores exploratórios de notificações de SRAG; um arquivo oficial por ano epidemiológico.')
     n=metric(df,'notificacoes'); sel=scoping(df,focus)
     c1,c2,c3,c4=st.columns(4)
-    with c1:st.metric('Notificações SRAG',number(n))
-    with c2:st.metric('Agente selecionado' if focus!='todos' else 'Com ≥1 marcador viral',number(sel if focus!='todos' else metric(df,'com_deteccao')))
-    with c3:st.metric('Óbitos por SRAG (evolução=2)',number(metric(df,'obitos_srag') if focus=='todos' else metric(df,f'obito_{focus}')))
-    with c4:st.metric('UTI registrada',number(metric(df,'uti') if focus=='todos' else metric(df,f'uti_{focus}')))
+    with c1:kpi('Notificações SRAG',number(n),'Registros no recorte')
+    with c2:kpi('Agente selecionado' if focus!='todos' else 'Com ≥1 marcador viral',number(sel if focus!='todos' else metric(df,'com_deteccao')),'Detecção registrada')
+    with c3:kpi('Óbitos por SRAG',number(metric(df,'obitos_srag') if focus=='todos' else metric(df,f'obito_{focus}')),'Evolução = 2')
+    with c4:kpi('UTI registrada',number(metric(df,'uti') if focus=='todos' else metric(df,f'uti_{focus}')),'UTI = 1')
     if no_rows(df):return
     a,b=st.columns([1.1,1],gap='large')
     with a:
@@ -129,7 +230,7 @@ def virus_page(df,focus):
     title('Agentes virais','Detecções registradas no mesmo sistema de vigilância; não inferir espécie viral exclusivamente pela classificação final.')
     if no_rows(df):return
     counts=pd.DataFrame([{'agente':key,'Agente':label,'Registros':metric(df,'v_'+key)} for key,label in VIRUSES.items()]).sort_values('Registros',ascending=False)
-    st.metric('Notificações com ≥2 grupos virais detectados',number(metric(df,'codeteccoes')))
+    kpi('Notificações com ≥2 grupos virais detectados',number(metric(df,'codeteccoes')),'Marcadores não exclusivos')
     a,b=st.columns([1.25,1])
     with a:
         fig=px.bar(counts,x='Agente',y='Registros',text='Registros',color_discrete_sequence=[C_PRIMARY]);fig.update_xaxes(tickangle=-27)
@@ -165,43 +266,85 @@ def trend_page(df,focus):
     yr=summarize(df,['ano'])[['ano','notificacoes','com_deteccao','obitos_srag']]
     st.dataframe(yr.sort_values('ano'),hide_index=True,use_container_width=True)
 
-def geography(df,focus):
-    title('Distribuição geográfica','UF de residência (SG_UF); contagens absolutas, sem ajuste para população.')
+def geography(df,focus, selected_ufs, municipal_data, year_scope):
+    title('Distribuição geográfica',
+          'Distribuição de notificações por residência. Brasil: UFs (2019–2026); MT/MS: municípios (2023–2026). Valores absolutos.')
+    # Mudança de escala: somente MT e/ou MS selecionados => mapa municipal.
+    # Os cubos nacionais não possuem município nem conservam cruzamentos
+    # por semana, idade ou sexo na escala municipal. Nunca reaproveitar os
+    # totais filtrados nacionais como se fossem totais municipais.
+    municipio_ufs = {'MT','MS'}
+    municipio_years = {2023,2024,2025,2026}
+    if selected_ufs and set(selected_ufs).issubset(municipio_ufs):
+        mapa_anos = sorted(set(year_scope).intersection(municipio_years))
+        if mapa_anos and not municipal_data.empty:
+            mapa = municipal_data[municipal_data.ano.isin(mapa_anos)]
+            st.caption('**Visualização municipal ampliada:** '+', '.join(selected_ufs)
+                       +' · anos '+', '.join(map(str,mapa_anos))
+                       +'. As contagens por município são anuais; os filtros de sexo, idade'
+                       +' e semana NÃO se aplicam a este mapa.')
+            if len(mapa_anos)<len(set(year_scope)):
+                st.info('O detalhamento municipal cobre apenas 2023–2026. '
+                        'Os anos 2019–2022 permanecem disponíveis no mapa estadual, '
+                        'quando selecionados sem restringir a MT/MS.')
+            if municipal_map(mapa, list(selected_ufs), focus, str(DATA), height=690):
+                return
+        else:
+            st.info('O mapa municipal está disponível para 2023–2026. '
+                    'Selecione ao menos um desses anos ou consulte o mapa estadual abaixo.')
     if no_rows(df):return
     a=summarize(df,['uf'])
     a=a[a.uf.isin(CAPITALS)].copy().sort_values(agent_col(focus),ascending=False)
+    if a.empty:
+        st.info('Nenhuma UF identificada para o recorte.');return
     a['Indicador']=a[agent_col(focus)]
     a['UF']=a['uf']
     a['lat']=a.uf.map({k:v[0] for k,v in CAPITALS.items()})
     a['lon']=a.uf.map({k:v[1] for k,v in CAPITALS.items()})
-    c1,c2=st.columns([1.4,0.9],gap='large')
+    st.caption('Indicador no mapa: '+(VIRUSES[focus] if focus!='todos' else 'Todas as notificações de SRAG'))
+    c1,c2=st.columns([1.7,0.85],gap='large')
     with c1:
-        # Polígonos UF (opcional) vêm dos dados preparados; caso contrário exibimos marcadores nas capitais.
         features=geojson()
-        used=False
-        if features:
-            sample=features.get('features',[])
-            if sample:
-                prop=sample[0].get('properties',{})
-                # Malha IBGE pode vir com sigla, SIGLA, UF ou nome da UF.
-                key=next((x for x in ('sigla','SIGLA','uf','UF') if x in prop),None)
-                if key:
-                    fig=px.choropleth(a,geojson=features,locations='uf',featureidkey=f'properties.{key}',
-                                      color='Indicador',hover_name='UF',hover_data={'notificacoes':True},color_continuous_scale='Blues')
-                    fig.update_geos(fitbounds='locations',visible=False)
-                    chart(fig,500);used=True
-        if not used:
-            fig=px.scatter_geo(a,lat='lat',lon='lon',size='Indicador',color='Indicador',
-                               hover_name='UF',hover_data={'notificacoes':True,'lat':False,'lon':False},
-                               projection='natural earth',size_max=45,color_continuous_scale='Blues')
-            fig.update_geos(lataxis_range=[-35,6],lonaxis_range=[-76,-31],showland=True,landcolor='#eff3f4',
-                            showcountries=True,countrycolor='#afbdc5',showcoastlines=False)
-            chart(fig,500)
-            st.caption('Marcadores estão posicionados nas capitais apenas para indicar as UFs; não são locais reais de casos. Para mapa por polígonos, a preparação pode incorporar malha UF.')
+        used_polygons=False
+        if features and len(features.get('features',[]))==27:
+            prop=features['features'][0].get('properties',{})
+            key=next((x for x in ('sigla','SIGLA','uf','UF') if x in prop),None)
+            if key:
+                fig=px.choropleth(
+                    a,geojson=features,locations='uf',featureidkey=f'properties.{key}',
+                    color='Indicador',hover_name='UF',
+                    hover_data={'notificacoes':':,','Indicador':':,','uf':False},
+                    color_continuous_scale=['#e7f2f7','#bedae7','#7cb5c9','#2b789c','#12425d']
+                )
+                fig.update_geos(fitbounds='locations',visible=False,
+                    projection_type='mercator',showcoastlines=False)
+                fig.update_layout(coloraxis_colorbar=dict(title='Registros',len=.72))
+                chart(fig,620)
+                used_polygons=True
+        if not used_polygons:
+            # MapLibre com mosaicos de mapa é mais legível do que scatter_geo sem malha.
+            # São pontos representativos da UF, NÃO coordenadas de pacientes.
+            fig=px.scatter_map(
+                a,lat='lat',lon='lon',size='Indicador',color='Indicador',
+                hover_name='UF',hover_data={'notificacoes':':,','Indicador':':,','lat':False,'lon':False},
+                map_style='open-street-map',center={'lat':-15.3,'lon':-53.1},zoom=2.9,
+                size_max=40,color_continuous_scale=['#7cb5c9','#155a72','#0c394f']
+            )
+            fig.update_traces(marker={'opacity':.82})
+            fig.update_layout(coloraxis_colorbar=dict(title='Registros',len=.72))
+            chart(fig,620)
+            st.caption('Mapa de apoio: cada círculo foi posicionado na capital para representar a UF; as coordenadas não correspondem aos locais dos casos. A visualização com polígonos depende de `data/malha_uf.geojson`. O mapa base utiliza mosaicos cartográficos online.')
     with c2:
-        fig=px.bar(a.sort_values('Indicador').tail(18),x='Indicador',y='UF',orientation='h',text='Indicador',color_discrete_sequence=[C_PRIMARY])
-        chart(fig,500)
-    st.dataframe(a[['UF','notificacoes','Indicador','obitos_srag']].sort_values('Indicador',ascending=False),hide_index=True,use_container_width=True)
+        shown=a.sort_values('Indicador').tail(15)
+        fig=px.bar(shown,x='Indicador',y='UF',orientation='h',text='Indicador',
+                   color_discrete_sequence=[C_PRIMARY],title='15 UFs com mais registros')
+        fig.update_traces(textposition='outside',cliponaxis=False)
+        fig.update_layout(xaxis_title='Notificações',yaxis_title='',margin=dict(l=2,r=32,t=50,b=15))
+        chart(fig,620)
+    st.subheader('Tabela por unidade da federação')
+    st.dataframe(a[['UF','notificacoes','Indicador','obitos_srag']].sort_values('Indicador',ascending=False),
+                 hide_index=True,use_container_width=True)
+    st.caption('A maior quantidade de notificações não significa necessariamente maior risco: as comparações dependem de população, intensidade de testagem e acesso aos serviços de saúde.')
 
 def epidemiology(df,focus):
     title('Perfil epidemiológico','Distribuição das notificações por sexo, idade, classificação final e desfechos registrados.')
@@ -219,10 +362,23 @@ def epidemiology(df,focus):
     st.subheader('Classificação final da SRAG')
     count=pd.DataFrame([{'Classificação':label,'Registros':metric(df,f'classe_{k}')} for k,label in CLASS.items()])
     fig=px.bar(count,x='Classificação',y='Registros',text='Registros',color_discrete_sequence=[C_PRIMARY]);chart(fig,355)
+
+    if all(col in df.columns for col in RESOLVED_CLASS2):
+        st.subheader('Detalhamento dos registros classificados como “Outro vírus respiratório”')
+        resolved = pd.DataFrame([{'Categoria resolvida':label,'Registros':metric(df,key)} for key,label in RESOLVED_CLASS2.items()])
+        resolved = resolved[resolved['Registros']>0].sort_values('Registros',ascending=False)
+        if not resolved.empty:
+            fig=px.bar(resolved,x='Categoria resolvida',y='Registros',text='Registros',color_discrete_sequence=[C_SECONDARY])
+            fig.update_xaxes(tickangle=-25)
+            chart(fig,365)
+            st.caption('Esse detalhamento só redistribui os casos já classificados como “Outro vírus respiratório” com base nos marcadores laboratoriais positivos registrados na mesma notificação.')
+    else:
+        st.info('Para detalhar a categoria “Outro vírus respiratório”, reprocese a base com a versão atualizada de `construir_base.py`.')
+
     c1,c2,c3=st.columns(3)
-    with c1:st.metric('Hospitalização (campo=1)',number(metric(df,'hospitalizados')))
-    with c2:st.metric('UTI (campo=1)',number(metric(df,'uti') if focus=='todos' else metric(df,f'uti_{focus}')))
-    with c3:st.metric('Óbito por SRAG (EVOLUCAO=2)',number(metric(df,'obitos_srag') if focus=='todos' else metric(df,f'obito_{focus}')))
+    with c1:kpi('Hospitalização registrada',number(metric(df,'hospitalizados')),'Campo HOSPITAL = 1')
+    with c2:kpi('UTI registrada',number(metric(df,'uti') if focus=='todos' else metric(df,f'uti_{focus}')),'Campo UTI = 1')
+    with c3:kpi('Óbito por SRAG',number(metric(df,'obitos_srag') if focus=='todos' else metric(df,f'obito_{focus}')),'Evolução = 2')
     st.caption('Indicadores de desfecho não foram ajustados por atraso de encerramento; estimativas de letalidade exigem análise específica e denominadores apropriados. Classificação final é distinta dos marcadores laboratoriais.')
 
 def explorer(df,focus):
@@ -240,7 +396,7 @@ def explorer(df,focus):
 
 def methods(meta):
     title('Métodos e auditoria','Origem, recortes temporais e limitações de interpretação do snapshot publicado.')
-    st.write('**Fonte exclusiva:** SIVEP-Gripe — SRAG. Dados oficiais nacionais publicados no Portal de Dados Abertos do SUS.')
+    st.write('**Fonte exclusiva:** SIVEP-Gripe — Sistema de Informação da Vigilância Epidemiológica da Gripe, do Ministério da Saúde. Os dados públicos de SRAG registram casos hospitalizados e óbitos por SRAG independentemente de internação. O painel não utiliza e-SUS Notifica nem SG Sentinela.')
     st.link_button('Abrir coleção oficial',meta.get('colecao_oficial','https://dadosabertos.saude.gov.br/dataset/srag-2019-a-2026'))
     st.markdown('''
 **Interpretação dos indicadores**
@@ -251,9 +407,14 @@ def methods(meta):
 - A ausência de marcador positivo **não** significa teste negativo ou resultado não detectável.
 - Óbito por SRAG usa `EVOLUCAO=2`. Óbito por outras causas não entra no numerador; campos não preenchidos permanecem desconhecidos.
 - Codetecção corresponde a mais de um grupo viral marcado como positivo na mesma notificação.
+- O detalhamento de `CLASSI_FIN=2` utiliza os marcadores laboratoriais correspondentes; esse agrupamento adicional não modifica a classificação final original nem identifica necessariamente a etiologia com certeza.
 - Bases de 2019 a 2024 têm cobertura diferente da vigilância após a pandemia. Comparações precisam considerar alterações de definição, testagem e vigilância.
 - Dados de 2025 e 2026 são sujeitos a revisão; o dashboard **não se atualiza sozinho**. Reprocessar e publicar novos agregados para mudar o snapshot.
-- Arquivos de publicação são **agregados**, sem nomes, datas diárias, números de notificação ou municípios. Agregação não é garantia formal de anonimização.
+- Arquivos de publicação são **agregados**, sem nomes, datas diárias ou números de notificação. O complemento municipal inclui município e ano, sem sexo, idade ou semana; os gráficos temporais de maior escala retêm estratos epidemiológicos. Agregação **não é garantia formal de anonimização**; avaliar ocultação de células pequenas antes de publicar.
+- O complemento 2023–2026 foi construído separadamente a partir dos CSVs oficiais, sem alterar ou somar novamente os cubos nacionais.
+- Município por `CO_MUN_RES` (residência); malhas municipais do IBGE. Não é município da coleta, atendimento ou notificação.
+- Influenza A e B são distinguidas por tipagem laboratorial positiva, não exclusivamente por `CLASSI_FIN`. Subtipos H1N1/H3N2 e linhagens Victoria/Yamagata são contados apenas com PCR positivo e subtipo/linhagem informados.
+- Na comparação mensal, mês derivado de `DT_SIN_PRI`; mês 0 indica campo inválido/ano incompatível. Na análise semanal, utilizar `SEM_PRI`.
 ''')
     a=[]
     for year,item in sorted(meta.get('anos',{}).items()):
@@ -276,7 +437,7 @@ if not available:
 
 with st.sidebar:
     st.markdown('### Observatório SRAG · Brasil')
-    st.caption('SIVEP-Gripe | fonte única')
+    st.caption('Ministério da Saúde · SIVEP-Gripe')
     page=st.radio('Navegação',PAGES)
     st.divider()
     st.markdown('#### Filtros globais')
@@ -298,6 +459,7 @@ with st.sidebar:
     focus=st.selectbox('Agente em foco',['todos',*VIRUSES],index=0,
                         format_func=lambda x:'Todos os registros' if x=='todos' else VIRUSES[x],key='f_focus')
     st.divider()
+    st.caption('Selecione MT ou MS em UF de residência para exibir municípios na página Geografia.')
     st.caption('Snapshot offline: dados previamente tratados e versionados no GitHub.')
     st.caption('Última preparação: '+str(META.get('gerado_em_utc','não informada'))[:10])
 
@@ -307,10 +469,13 @@ if ufs_sel:filtered=filtered[filtered.uf.isin(ufs_sel)]
 if sex_sel:filtered=filtered[filtered.sexo.isin(sex_sel)]
 if age_sel:filtered=filtered[filtered.faixa_etaria.isin(age_sel)]
 
-st.title('Vigilância de vírus respiratórios no Brasil')
-st.markdown('**Síndrome Respiratória Aguda Grave (SRAG)** · SIVEP-Gripe · painel epidemiológico exploratório')
-if page=='Visão geral':
-    st.caption('Painel de pesquisa construído a partir de dados públicos nacionais do Ministério da Saúde.')
+# Complementos independentes não sobrescrevem os cubos nacionais.
+CO_MUN = load_complement(str(DATA),tuple(available),'municipios')
+if not CO_MUN.empty:
+    CO_MUN = CO_MUN[CO_MUN.ano.isin(years)]
+CO_TIME = apply_filters(load_complement(str(DATA),tuple(available),'temporal'),
+                        years,week,sex_sel,age_sel)
+header(META,available)
 if not META.get('completo_2019_2026'):
     st.warning(f"**BASE PARCIAL:** anos disponíveis {', '.join(map(str,available))}. Para completar 2019–2026, execute `python construir_base.py --todos` e publique a pasta `data/` no GitHub.")
 st.caption(f'**{number(metric(filtered,"notificacoes"))}** notificações após os filtros · arquivos disponíveis: {min(available)}–{max(available)} · atualização não automática')
@@ -318,9 +483,10 @@ st.divider()
 if page==PAGES[0]:overall(filtered,focus)
 elif page==PAGES[1]:virus_page(filtered,focus)
 elif page==PAGES[2]:trend_page(filtered,focus)
-elif page==PAGES[3]:geography(filtered,focus)
-elif page==PAGES[4]:epidemiology(filtered,focus)
-elif page==PAGES[5]:explorer(filtered,focus)
+elif page==PAGES[3]:geography(filtered,focus,ufs_sel,CO_MUN,years)
+elif page==PAGES[4]:regional_page(filtered,CO_MUN,CO_TIME,years,ufs_sel,focus,str(DATA))
+elif page==PAGES[5]:epidemiology(filtered,focus)
+elif page==PAGES[6]:explorer(filtered,focus)
 else:methods(META)
 st.divider()
-st.caption('Fonte: Ministério da Saúde, SIVEP-Gripe/SRAG | Notificações e detecções laboratoriais não equivalem à incidência populacional. Consulte a metodologia.')
+st.caption('Observatório SRAG Brasil · Fonte primária: Ministério da Saúde / SIVEP-Gripe · Indicadores baseados em notificações oficiais, não em incidência populacional · Idealização: Sara Cândida Ferreira dos Santos.')
